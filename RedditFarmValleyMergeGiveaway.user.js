@@ -106,6 +106,31 @@
         .got-it-btn {
             white-space: nowrap;
         }
+        /* Footer Area */
+        #fmv-popup-footer {
+            padding: 5px 15px;
+            border-top: 1px solid #ddd;
+            text-align: right;
+            background-color: #f7f7f7;
+        }
+
+        /* Reset Button Style */
+        #fmv-reset-btn {
+            background-color: #f44336; /* Red */
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 12px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        #fmv-reset-btn:hover {
+            background-color: #d32f2f;
+        }
     `);
 
 
@@ -202,101 +227,119 @@
         return timeDifference < NINETY_DAYS_MS;
     };
 
+    // --- Updated Link Storage Functions ---
+
+// Retrieves clicked link IDs and their timestamps
     const getLinkStorage = () => {
         try {
+            // Data structure: { id: timestamp_ms, id2: timestamp_ms, ... }
             const data = localStorage.getItem(LINK_STORAGE_KEY);
-            return data ? JSON.parse(data) : {};
+            // Clean up old links (optional, but good practice for storage)
+            const storage = data ? JSON.parse(data) : {};
+
+            // Clean links older than 90 days to prevent localStorage bloat
+            const now = Date.now();
+            for (const id in storage) {
+                if (now - storage[id] > NINETY_DAYS_MS) {
+                    delete storage[id];
+                }
+            }
+            return storage;
         } catch (e) {
             console.error("Error reading link storage:", e);
             return {};
         }
     };
 
+// Saves a clicked link ID with a current timestamp (milliseconds)
     const saveLinkClicked = (id) => {
         const storage = getLinkStorage();
-        storage[id] = true;
+        // Save the current timestamp in milliseconds
+        storage[id] = Date.now();
         localStorage.setItem(LINK_STORAGE_KEY, JSON.stringify(storage));
     };
 
-    const isLinkClicked = (id) => {
+// Checks if a link has been clicked and returns the timestamp (or 0 if not clicked)
+    const getLinkClickTime = (id) => {
         const storage = getLinkStorage();
-        return !!storage[id];
+        return storage[id] || 0; // Returns timestamp in ms or 0
     };
 
     /**
- * Converts a Unix timestamp (seconds) to a DD/MM string.
- * @param {number} utcTimestamp - The Unix timestamp in seconds.
- * @returns {string} Formatted date string (DD/MM).
- */
-const formatUtcToDdMm = (utcTimestamp) => {
-    // 1. Convert seconds to milliseconds
-    const date = new Date(utcTimestamp * 1000);
+     * Converts a Unix timestamp (seconds) to a DD/MM string.
+     * @param {number} utcTimestamp - The Unix timestamp in seconds.
+     * @returns {string} Formatted date string (DD/MM).
+     */
+    const formatUtcToDdMm = (utcTimestamp) => {
+        // 1. Convert seconds to milliseconds
+        const date = new Date(utcTimestamp * 1000);
 
-    // 2. Get Day (add 1 if month is zero-indexed)
-    const day = date.getDate().toString().padStart(2, '0');
+        // 2. Get Day (add 1 if month is zero-indexed)
+        const day = date.getDate().toString().padStart(2, '0');
 
-    // 3. Get Month (add 1 as it is 0-indexed)
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        // 3. Get Month (add 1 as it is 0-indexed)
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
 
-    return `${day}/${month}`;
-};
+        return `${day}/${month}`;
+    };
 
     // --- Processing and UI Logic ---
 
     /**
- * Fetches and processes the Reddit JSON feed.
- * @returns {Object} Grouped data or null.
- */
-const fetchAndProcessFeed = async () => {
-    try {
-        const data = await fetchGiveawayFeed();
-        // Group the data: { priority: { keyword: [entries], ... }, ... }
-        const groupedData = {};
-        const currentTimeMs = Date.now();
+     * Fetches and processes the Reddit JSON feed.
+     * @returns {Object} Grouped data or null.
+     */
+    /**
+     * Fetches and processes the Reddit JSON feed.
+     * NOTE: All filtering (including the 24-hour cutoff) is now handled
+     * in renderPopupContent for the New/Active/Finished logic.
+     * @returns {Object} Grouped data or null.
+     */
+    const fetchAndProcessFeed = async () => {
+        try {
+            const data = await fetchGiveawayFeed();
+            // Group the data: { priority: { keyword: [entries], ... }, ... }
+            const groupedData = {};
+            // const currentTimeMs = Date.now(); // Not needed here anymore
 
-        data.data.children.forEach(child => {
-            // Destructure the necessary fields, including created_utc
-            const {title, url, name: id, created_utc} = child.data;
-//console.log([title, url, id, formatUtcToDdMm(created_utc)]);
-            // 1. **24-Hour Check**
-            // Reddit's created_utc is in seconds, so we multiply by 1000 for milliseconds.
-            const postTimeMs = created_utc * 1000;
-            const postAgeMs = currentTimeMs - postTimeMs;
+            data.data.children.forEach(child => {
+                const {title, url, name: id, created_utc} = child.data;
 
-            if (postAgeMs > TWENTY_FOUR_HOURS_MS) {
-                // Skip the post if it's older than 24 hours
-                return;
-            }
+                // --- (Your debugging line should go here, using formatUtcToDdMm(created_utc)) ---
 
-            const parsed = parseTitle(title);
+                // **24-HOUR FILTER REMOVED HERE**
 
-            if (parsed) {
-                const {priority, keyword} = parsed;
+                const parsed = parseTitle(title);
 
-                // 2. **Keyword Exclusion Check**
-                if (isKeywordExcluded(keyword)) return;
+                if (parsed) {
+                    const {priority, keyword} = parsed;
 
-                // 3. **Grouping**
-                // Initialize structure if needed
-                if (!groupedData[priority]) {
-                    groupedData[priority] = {};
+                    // 2. Keyword Exclusion Check
+                    if (isKeywordExcluded(keyword)) return;
+
+                    // 3. Grouping
+                    // Initialize structure if needed
+                    if (!groupedData[priority]) {
+                        groupedData[priority] = {};
+                    }
+                    if (!groupedData[priority][keyword]) {
+                        groupedData[priority][keyword] = [];
+                    }
+
+                    // ADDED created_utc to the final entry object
+                    groupedData[priority][keyword].push({link: url, id, created_utc});
                 }
-                if (!groupedData[priority][keyword]) {
-                    groupedData[priority][keyword] = [];
-                }
+            });
 
-                // Add the valid post
-                groupedData[priority][keyword].push({link: url, id});
-            }
-        });
-        return groupedData;
+            return groupedData;
 
-    } catch (error) {
-        console.error("Failed to fetch or process Reddit feed:", error);
-        // Handle error display in the main init function
-        return null;
-    }
-};
+        } catch (error) {
+            console.error("Failed to fetch or process Reddit feed:", error);
+            // Handle error display in the main init function
+            return null;
+        }
+    };
+
 
     /**
      * Injects the necessary HTML structure for the pop-up into the Reddit page.
@@ -309,19 +352,30 @@ const fetchAndProcessFeed = async () => {
         popup = document.createElement('div');
         popup.id = 'fmv-giveaways-popup';
         popup.innerHTML = `
-            <div id="fmv-popup-header">
-                <span>Sticker Giveaways</span>
-                <button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>
-            </div>
-            <div id="fmv-popup-body">
-                <p>Loading...</p>
-            </div>
-        `;
+        <div id="fmv-popup-header">
+            <span>Sticker Giveaways</span>
+            <button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>
+        </div>
+        <div id="fmv-popup-body">
+            <p>Loading...</p>
+        </div>
+        <div id="fmv-popup-footer">
+            <button id="fmv-reset-btn" title="Clears all stored 'Got It' keywords and link click history.">Reset Data</button>
+        </div>
+    `;
         document.body.appendChild(popup);
 
         // Attach close listener
         document.getElementById('fmv-close-btn').addEventListener('click', () => {
             popup.style.display = 'none';
+        });
+
+        // Attach the new Reset listener here
+        document.getElementById('fmv-reset-btn').addEventListener('click', () => {
+            if (confirm("Are you sure you want to reset ALL Sticker Giveaway data (keywords and link history)?")) {
+                clearLocalStorageData();
+                initApp(); // Re-initialize to reload with cleared data
+            }
         });
 
         return document.getElementById('fmv-popup-body');
@@ -361,6 +415,11 @@ const fetchAndProcessFeed = async () => {
      * Populates the pop-up with the fetched and processed data.
      * @param {Object} groupedData - Grouped data by priority and keyword.
      */
+    /**
+     * Populates the pop-up with the fetched and processed data,
+     * implementing the New/Active/Finished logic and filtering.
+     * @param {Object} groupedData - Grouped data by priority and keyword.
+     */
     function renderPopupContent(groupedData) {
         const popupBody = injectPopupHtml();
         if (!popupBody) return;
@@ -369,8 +428,8 @@ const fetchAndProcessFeed = async () => {
 
         let totalGiveaways = 0;
         let html = '';
-        // Sort from 5 (highest priority) to 1 (lowest)
         const priorities = Object.keys(groupedData).sort((a, b) => b - a);
+        const currentTimeMs = Date.now();
 
         priorities.forEach(priority => {
             const keywords = groupedData[priority];
@@ -379,26 +438,69 @@ const fetchAndProcessFeed = async () => {
 
             Object.keys(keywords).forEach(keyword => {
                 const entries = keywords[keyword];
-                totalGiveaways += entries.length;
 
-                // Keyword Header and "Got It" button
-                html += `<li style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start;">
-                            <strong style="flex-grow: 1;">${keyword}</strong>
-                            <button class="got-it-btn" data-keyword="${keyword}">Got It!</button>
-                        </li>
-                        <ul style="list-style: disc; margin-left: 10px;">`;
+                // Collect entries that should be displayed
+                const visibleEntries = [];
 
                 // Links for that keyword
                 entries.forEach(entry => {
-                    const isClicked = isLinkClicked(entry.id);
-                    const linkStyle = isClicked ? 'text-decoration: line-through; color: #888;' : '';
+                    const clickTimeMs = getLinkClickTime(entry.id);
+                    const postTimeMs = entry.created_utc * 1000;
+
+                    // Calculate current age of the post
+                    const currentPostAgeMs = currentTimeMs - postTimeMs;
+                    const isPostOlderThan24h = currentPostAgeMs >= TWENTY_FOUR_HOURS_MS;
+
+                    // CRUCIAL NEW CHECK: Has the link been clicked AFTER it passed the 24-hour mark?
+                    // This determines if the user has acknowledged the "Finished" status.
+                    const isClickFinishedAck = clickTimeMs > 0 && (clickTimeMs >= postTimeMs + TWENTY_FOUR_HOURS_MS);
+
+                    let linkStatus = 'New';
+                    let linkStyle = '';
+                    let linkLabel = 'Link to Giveaway';
+
+                    // 1. --- HIDING RULE ---
+                    // Hide if it's older than 24h AND the user has clicked it since it passed the 24h mark.
+                    if (isPostOlderThan24h && isClickFinishedAck) {
+                        return; // DO NOT RENDER (Finished and Acknowledged)
+                    }
+
+                    // 2. --- RENDERING RULES ---
+                    if (isPostOlderThan24h) {
+                        // Post is older than 24h, and not yet acknowledged (click occurred before aging, or no click at all)
+                        linkStatus = 'Finished';
+                        linkStyle = 'text-decoration: line-through; color: #888;';
+                        linkLabel = 'Finished (Older than 24h)';
+                    } else if (clickTimeMs > 0) {
+                        // Post is within 24h AND has been clicked
+                        linkStatus = 'Active';
+                        linkStyle = 'color: #f7a01d; font-weight: bold;'; // Amber/Orange color
+                    }
+
+                    // If we reached this point, the link is visible
+                    visibleEntries.push({ entry, linkStatus, linkStyle, linkLabel });
+                }); // End entries.forEach
+
+                // If there are no visible entries for this keyword, skip rendering the keyword block
+                if (visibleEntries.length === 0) return;
+
+                // Render the keyword block header
+                html += `<li style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start;">
+                        <strong style="flex-grow: 1;">${keyword}</strong>
+                        <button class="got-it-btn" data-keyword="${keyword}">Got It!</button>
+                    </li>
+                    <ul style="list-style: disc; margin-left: 10px;">`;
+
+                // Render the visible links
+                visibleEntries.forEach(({ entry, linkStatus, linkStyle, linkLabel }) => {
+                    totalGiveaways++;
 
                     html += `<li style="margin-bottom: 3px;">
-                                <a href="${entry.link}" target="_blank" class="fmv-giveaway-link giveaway-link" data-id="${entry.id}"
-                                   style="${linkStyle}">
-                                    Link to Giveaway
-                                </a>
-                            </li>`;
+                            <a href="${entry.link}" target="_blank" class="fmv-giveaway-link giveaway-link" data-id="${entry.id}" 
+                               style="${linkStyle}">
+                                ${linkLabel} (${linkStatus})
+                            </a>
+                        </li>`;
                 });
                 html += '</ul>';
             });
@@ -409,15 +511,15 @@ const fetchAndProcessFeed = async () => {
         const popup = document.getElementById('fmv-giveaways-popup');
 
         if (totalGiveaways === 0) {
-             popupBody.innerHTML = '<p>No active, uncollected giveaways found.</p>';
-             header.innerHTML = '<span>Sticker Giveaways (0)</span><button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>';
+            popupBody.innerHTML = '<p>No new or active giveaways found.</p>';
+            header.innerHTML = '<span>Sticker Giveaways (0)</span><button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>';
         } else {
-             popupBody.innerHTML = html;
-             header.innerHTML = `<span>Sticker Giveaways (${totalGiveaways})</span><button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>`;
-             attachEventListeners();
+            popupBody.innerHTML = html;
+            header.innerHTML = `<span>Sticker Giveaways (${totalGiveaways})</span><button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>`;
+            attachEventListeners();
         }
 
-        // Re-attach close listener (since we updated the innerHTML of the header)
+        // Re-attach close listener
         document.getElementById('fmv-close-btn').addEventListener('click', () => {
             popup.style.display = 'none';
         });
@@ -426,6 +528,14 @@ const fetchAndProcessFeed = async () => {
         popup.style.display = 'block';
     }
 
+    /**
+     * Clears all data stored by the userscript in localStorage.
+     */
+    const clearLocalStorageData = () => {
+        localStorage.removeItem(KEYWORD_STORAGE_KEY);
+        localStorage.removeItem(LINK_STORAGE_KEY);
+        console.log("Sticker Giveaway userscript data cleared.");
+    };
 
     /**
      * Main function to initialize and run the application.
@@ -442,8 +552,8 @@ const fetchAndProcessFeed = async () => {
             // Error case handled by fetchAndProcessFeed
             const popupBody = document.getElementById('fmv-popup-body');
             if(popupBody) {
-                 popupBody.innerHTML = `<p style="color:red;">Error loading feed. Check browser console.</p>`;
-                 document.getElementById('fmv-giveaways-popup').style.display = 'block';
+                popupBody.innerHTML = `<p style="color:red;">Error loading feed. Check browser console.</p>`;
+                document.getElementById('fmv-giveaways-popup').style.display = 'block';
             }
         }
     };
