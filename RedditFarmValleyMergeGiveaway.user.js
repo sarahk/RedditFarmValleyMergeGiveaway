@@ -5,6 +5,7 @@
 // @description  Fetches Reddit giveaway data and displays filtered results in a floating pop-up.
 // @author       itamer
 // @match        https://sh.reddit.com/r/FarmMergeValley/*
+// @match        https://www.reddit.com/r/FarmMergeValley/*
 // @grant        GM.xmlHttpRequest
 // @grant        GM_addStyle
 // @run-at       document-idle
