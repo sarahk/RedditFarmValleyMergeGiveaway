@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      1.10
+// @version      1.11
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data and displays filtered results in a floating pop-up.
@@ -9,7 +9,7 @@
 // @match        https://sh.reddit.com/r/FarmMergeValley/*
 // @match        https://www.reddit.com/r/FarmMergeValley/*
 // @grant        GM.xmlHttpRequest
-// @grant        GM_addStyle
+// @grant        GM.addStyle
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -32,7 +32,7 @@
     // --- End Configuration ---
 
     // Inject the CSS styles for the floating panel
-    GM_addStyle(`
+    GM.addStyle(`
         /* Container for the Pop-up */
         #fmv-giveaways-popup {
             position: fixed;
