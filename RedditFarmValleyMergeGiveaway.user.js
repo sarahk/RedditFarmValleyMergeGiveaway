@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  Fetches Reddit giveaway data and displays filtered results in a floating pop-up.
 // @author       itamer
 // @match        https://sh.reddit.com/r/FarmMergeValley/*
