@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.10
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data and displays filtered results in a floating pop-up.
@@ -17,18 +17,18 @@
     'use strict';
 
     // --- Configuration ---
-    // Using the canonical API URL with restrict_sr=1 re-added for proper search context
-    //const TARGET_URL = 'https://www.reddit.com/r/FarmMergeValley/search.json?q=flair_name%3A%22%F0%9F%8E%81+Raffles%2FGiveaways%22&restrict_sr=1';
     const TARGET_URL = 'https://www.reddit.com/r/FarmMergeValley/search.json?q=flair_name%3A%22%F0%9F%8E%81+Raffles%2FGiveaways%22&restrict_sr=1&sort=new&t=month';
-
-
-
     const USER_AGENT = 'browser:FarmMergeValley-Sticker-App:v1.4 (by /u/itamer)';
     const GIVEAWAY_PREFIX = '[Sticker Giveaway]';
     const KEYWORD_STORAGE_KEY = 'sticker_giveaway_keywords';
     const LINK_STORAGE_KEY = 'sticker_giveaway_links';
     const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
     const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+    // --- NEW API CONFIGURATION ---
+    const API_TARGET_URL = 'https://fmv.itamer.com/api.php';
+    // *** IMPORTANT *** This MUST match the API_SECRET_KEY in your config.php file
+    const API_SECRET_KEY = 'pum@90Nervous';
     // --- End Configuration ---
 
     // Inject the CSS styles for the floating panel
@@ -163,13 +163,88 @@
     }
 
     /**
+     * Extracts required fields from the raw Reddit feed and formats them
+     * for insertion into the external database.
+     * @param {string} rawData - The raw JSON string from the Reddit API.
+     * @returns {Array<Object>} An array of post objects containing id, url, title, keyword, and stars.
+     */
+    function getSaveData(rawData) {
+        const data = JSON.parse(rawData);
+        const output = [];
+
+        // The data is located in data.data.children
+        data.data.children.forEach(child => {
+            const { title, url, name: id, created_utc } = child.data;
+
+            // Use the existing parseTitle function to extract priority/stars and keyword
+            const parsed = parseTitle(title);
+
+            if (parsed) {
+                const { priority, keyword } = parsed;
+
+                // Only save posts that successfully parsed and are valid giveaway entries
+                output.push({
+                    id: id,
+                    url: url,
+                    title: title,
+                    keyword: keyword,
+                    stars: priority, // 'priority' is the same as 'stars'
+                    created_utc: created_utc // Can be useful for server-side validation/logging
+                });
+            }
+        });
+
+        return output;
+    }
+
+    /**
+     * Sends the raw fetched data to the external API endpoint.
+     * @param {string} rawData - The raw JSON string from the Reddit API.
+     */
+    async function sendDataToApi(rawData) {
+        // Construct the payload as required: what='post' + the parsed datafeed
+        const payload = JSON.stringify({
+            what: 'post',
+            // Parse the raw JSON string to send the data as an object structure
+            payload: getSaveData(rawData)
+        });
+
+
+
+        GM.xmlHttpRequest({
+            method: 'POST',
+            url: API_TARGET_URL,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Api-Key': API_SECRET_KEY // Required by your apihandler.php
+            },
+            data: payload,
+            onload: function(response) {
+                if (response.status === 200 || response.status === 201) {
+                    console.log('API Data Upload Success:', response.responseText);
+                } else {
+                    console.error(`API Data Upload Failed: ${response.status} - ${response.responseText}`);
+                }
+            },
+            onerror: function(response) {
+                console.error('Network Error contacting external API:', response.error);
+            }
+        });
+    }
+
+
+    /**
      * Fetches data using the GM.xmlHttpRequest API wrapped in a Promise.
+     * Now returns an object containing both the parsed data and the raw text.
      */
     async function fetchGiveawayFeed() {
-        // console.log('Attempting to fetch data...'); // Keep this disabled for clean console
         try {
             const responseText = await gmXhrPromise(TARGET_URL);
-            return JSON.parse(responseText);
+
+            return {
+                data: JSON.parse(responseText),
+                rawData: responseText
+            };
         } catch (error) {
             console.error('Error fetching Reddit data:', error.message);
             throw error; // Re-throw to be caught by the main function
@@ -289,20 +364,21 @@
 
     /**
      * Fetches and processes the Reddit JSON feed.
-     * @returns {Object} Grouped data or null.
-     */
-    /**
-     * Fetches and processes the Reddit JSON feed.
-     * NOTE: All filtering (including the 24-hour cutoff) is now handled
-     * in renderPopupContent for the New/Active/Finished logic.
+     * Includes logic to send the raw data to the external API.
      * @returns {Object} Grouped data or null.
      */
     const fetchAndProcessFeed = async () => {
         try {
-            const data = await fetchGiveawayFeed();
+            const result = await fetchGiveawayFeed(); // result = { data: parsed, rawData: string }
+            const data = result.data;
+            const rawData = result.rawData;
+
+            // 1. Send data to external API (non-blocking)
+            sendDataToApi(rawData);
+
             // Group the data: { priority: { keyword: [entries], ... }, ... }
             const groupedData = {};
-            // const currentTimeMs = Date.now(); // Not needed here anymore
+            const currentTimeMs = Date.now();
 
             data.data.children.forEach(child => {
                 const {title, url, name: id, created_utc} = child.data;
@@ -414,10 +490,6 @@
     };
 
     /**
-     * Populates the pop-up with the fetched and processed data.
-     * @param {Object} groupedData - Grouped data by priority and keyword.
-     */
-    /**
      * Populates the pop-up with the fetched and processed data,
      * implementing the New/Active/Finished logic and filtering.
      * @param {Object} groupedData - Grouped data by priority and keyword.
@@ -498,7 +570,7 @@
                     totalGiveaways++;
 
                     html += `<li style="margin-bottom: 3px;">
-                            <a href="${entry.link}" target="_blank" class="fmv-giveaway-link giveaway-link" data-id="${entry.id}" 
+                            <a href="${entry.link}" target="_blank" class="fmv-giveaway-link giveaway-link" data-id="${entry.id}"
                                style="${linkStyle}">
                                 ${linkLabel} (${linkStatus})
                             </a>
