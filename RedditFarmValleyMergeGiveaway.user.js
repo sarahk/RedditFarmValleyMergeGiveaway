@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      1.11
+// @version      1.12
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data and displays filtered results in a floating pop-up.
@@ -9,7 +9,6 @@
 // @match        https://sh.reddit.com/r/FarmMergeValley/*
 // @match        https://www.reddit.com/r/FarmMergeValley/*
 // @grant        GM.xmlHttpRequest
-// @grant        GM.addStyle
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -31,8 +30,28 @@
     const API_SECRET_KEY = 'pum@90Nervous';
     // --- End Configuration ---
 
+    // --- NEW UNIVERSAL STYLING FUNCTION ---
+    /**
+     * Safely injects CSS styles using GM_addStyle if available,
+     * otherwise falls back to standard DOM injection.
+     * @param {string} css - The CSS string to inject.
+     */
+    function addStyle(css) {
+        // 1. Try the official GM_addStyle function (should work with the grant)
+        if (typeof GM_addStyle !== 'undefined') {
+            GM_addStyle(css);
+            return;
+        }
+
+        // 2. Fallback to standard DOM injection if GM_addStyle is still blocked
+        const style = document.createElement('style');
+        style.type = 'text/css';
+        style.textContent = css;
+        (document.head || document.body || document.documentElement).appendChild(style);
+    }
+    // --- END NEW FUNCTION ---
     // Inject the CSS styles for the floating panel
-    GM.addStyle(`
+    addStyle(`
         /* Container for the Pop-up */
         #fmv-giveaways-popup {
             position: fixed;
@@ -570,7 +589,7 @@
                     totalGiveaways++;
 
                     html += `<li style="margin-bottom: 3px;">
-                            <a href="${entry.link}" target="_blank" class="fmv-giveaway-link giveaway-link" data-id="${entry.id}"
+                            <a href="${entry.link}" target="_blank" class="fmv-giveaway-link giveaway-link" data-id="${entry.id}" 
                                style="${linkStyle}">
                                 ${linkLabel} (${linkStatus})
                             </a>
