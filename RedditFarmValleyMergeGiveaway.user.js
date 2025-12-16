@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up (API-Driven)
 // @namespace    http://tampermonkey.net/
-// @version      2.0 
+// @version      2.6
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -221,14 +221,11 @@
      */
     async function ingestRedditFeed() {
         try {
+            console.log('Get Reddit Feed');
             const responseText = await gmXhrPromise(REDDIT_FEED_URL);
-
+            console.log(['Feed received', responseText]);
             // --- CRITICAL CHANGE: Process data before sending ---
             const minimalData = processRawRedditData(responseText);
-
-            const apiData = {
-                payload: minimalData // Send the array of clean objects
-            };
 
             console.log("API Ingestion Request Payload:", minimalData);
 
@@ -635,55 +632,54 @@
         popup.style.display = 'block';
 
 
-
-}
-
-/**
- * Main function to initialize and run the application.
- */
-const initApp = async (skipUserIdCheck = false) => {
-    const uiElements = injectPopupHtml();
-
-    if (!uiElements || !uiElements.body) {
-        console.error("Failed to inject or retrieve UI elements.");
-        return;
     }
 
-    if (!skipUserIdCheck && !getStoredUserId()) {
-        uiElements.inputArea.style.display = 'block';
-        uiElements.body.innerHTML = '<p>Please enter your username above to view the giveaway feed.</p>';
+    /**
+     * Main function to initialize and run the application.
+     */
+    const initApp = async (skipUserIdCheck = false) => {
+        const uiElements = injectPopupHtml();
+
+        if (!uiElements || !uiElements.body) {
+            console.error("Failed to inject or retrieve UI elements.");
+            return;
+        }
+
+        if (!skipUserIdCheck && !getStoredUserId()) {
+            uiElements.inputArea.style.display = 'block';
+            uiElements.body.innerHTML = '<p>Please enter your username above to view the giveaway feed.</p>';
+            uiElements.popup.style.display = 'block';
+            return;
+        }
+
+        uiElements.inputArea.style.display = 'none';
+        uiElements.body.innerHTML = '<p>Loading giveaways...</p>';
         uiElements.popup.style.display = 'block';
-        return;
-    }
 
-    uiElements.inputArea.style.display = 'none';
-    uiElements.body.innerHTML = '<p>Loading giveaways...</p>';
-    uiElements.popup.style.display = 'block';
+        //const groupedData = await fetchAndProcessFeed();
+        //console.log(groupedData);
 
-    //const groupedData = await fetchAndProcessFeed();
-    //console.log(groupedData);
+        // if (groupedData) {
+        //     renderPopupContent(groupedData);
+        // } else {
+        //     uiElements.body.innerHTML = `<p style="color:red;">Error loading feed. Check browser console.</p>`;
+        // }
 
-    // if (groupedData) {
-    //     renderPopupContent(groupedData);
-    // } else {
-    //     uiElements.body.innerHTML = `<p style="color:red;">Error loading feed. Check browser console.</p>`;
-    // }
+        const feedResult = await fetchAndProcessFeed();
 
-    const feedResult = await fetchAndProcessFeed();
+        if (feedResult && feedResult.data) {
+            // State 1 & 2: API Feed is available. Always render the data.
+            // The renderPopupContent handles the "may not be shown" warning based on isUpToDate.
+            renderPopupContent(feedResult.data, feedResult.isUpToDate);
 
-    if (feedResult && feedResult.data) {
-        // State 1 & 2: API Feed is available. Always render the data.
-        // The renderPopupContent handles the "may not be shown" warning based on isUpToDate.
-        renderPopupContent(feedResult.data, feedResult.isUpToDate);
-
-    } else {
-        // State 3: The API GET request failed (feedResult is null). Show the critical error.
-        uiElements.body.innerHTML = `<p style="color:red; font-size: 1.2em; text-align: center; padding: 20px;">Latest Giveaways didn't load.</p>`; // <-- CORRECTED MESSAGE
-    }
-};
+        } else {
+            // State 3: The API GET request failed (feedResult is null). Show the critical error.
+            uiElements.body.innerHTML = `<p style="color:red; font-size: 1.2em; text-align: center; padding: 20px;">Latest Giveaways didn't load.</p>`; // <-- CORRECTED MESSAGE
+        }
+    };
 
 // Initialize on page load
-initApp();
+    initApp();
 
 })
 ();
