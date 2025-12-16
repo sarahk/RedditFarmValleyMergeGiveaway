@@ -1,163 +1,53 @@
 // ==UserScript==
-// @name         FarmMergeValley Giveaway Pop-up
+// @name         FarmMergeValley Giveaway Pop-up (API-Driven)
 // @namespace    http://tampermonkey.net/
-// @version      1.12
+// @version      2.0 
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
-// @description  Fetches Reddit giveaway data and displays filtered results in a floating pop-up.
+// @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
 // @author       itamer
 // @match        https://sh.reddit.com/r/FarmMergeValley/*
 // @match        https://www.reddit.com/r/FarmMergeValley/*
+// @match        https://sh.reddit.com/r/ClubSusan/*
+// @match        https://www.reddit.com/r/ClubSusan/*
 // @grant        GM.xmlHttpRequest
+// @grant        GM_addStyle
 // @run-at       document-idle
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
     // --- Configuration ---
-    const TARGET_URL = 'https://www.reddit.com/r/FarmMergeValley/search.json?q=flair_name%3A%22%F0%9F%8E%81+Raffles%2FGiveaways%22&restrict_sr=1&sort=new&t=month';
-    const USER_AGENT = 'browser:FarmMergeValley-Sticker-App:v1.4 (by /u/itamer)';
+    const REDDIT_FEED_URL = 'https://www.reddit.com/r/FarmMergeValley/search.json?q=flair_name%3A%22%F0%9F%8E%81+Raffles%2FGiveaways%22&restrict_sr=1&sort=new&t=month';
+    const USER_AGENT = 'browser:FarmMergeValley-Sticker-App:v2.4 (by /u/itamer)';
     const GIVEAWAY_PREFIX = '[Sticker Giveaway]';
-    const KEYWORD_STORAGE_KEY = 'sticker_giveaway_keywords';
-    const LINK_STORAGE_KEY = 'sticker_giveaway_links';
-    const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
-    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-    // --- NEW API CONFIGURATION ---
-    const API_TARGET_URL = 'https://fmv.itamer.com/api.php';
-    // *** IMPORTANT *** This MUST match the API_SECRET_KEY in your config.php file
+    // API Configuration
+    const API_TARGET_URL = 'https://fvm.itamer.com/api.php';
     const API_SECRET_KEY = 'pum@90Nervous';
-    // --- End Configuration ---
 
-    // --- NEW UNIVERSAL STYLING FUNCTION ---
-    /**
-     * Safely injects CSS styles using GM_addStyle if available,
-     * otherwise falls back to standard DOM injection.
-     * @param {string} css - The CSS string to inject.
-     */
+    // Storage Key for User ID
+    const USER_ID_STORAGE_KEY = 'fmv_user_id';
+
+    const TWENTY_FOUR_HOURS_S = 24 * 60 * 60;
+
+    // Global variable to hold the user ID once validated
+    let CURRENT_USER_ID = null;
+
+    // --- Utility Functions (addStyle, gmXhrPromise, etc. remain the same) ---
+
     function addStyle(css) {
-        // 1. Try the official GM_addStyle function (should work with the grant)
         if (typeof GM_addStyle !== 'undefined') {
             GM_addStyle(css);
             return;
         }
-
-        // 2. Fallback to standard DOM injection if GM_addStyle is still blocked
         const style = document.createElement('style');
         style.type = 'text/css';
         style.textContent = css;
         (document.head || document.body || document.documentElement).appendChild(style);
     }
-    // --- END NEW FUNCTION ---
-    // Inject the CSS styles for the floating panel
-    addStyle(`
-        /* Container for the Pop-up */
-        #fmv-giveaways-popup {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 300px;
-            max-height: 80vh;
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            z-index: 10000;
-            overflow: hidden;
-            display: none;
-            font-size: 14px;
-            font-family: inherit;
-        }
 
-        /* Header for Pop-up */
-        #fmv-popup-header {
-            background-color: #E2852E;
-            color: white;
-            padding: 10px 15px;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-        }
-
-        /* Body/Content Area */
-        #fmv-popup-body {
-            padding: 10px 15px;
-            overflow-y: auto;
-            max-height: calc(80vh - 50px);
-        }
-
-        /* Individual giveaway link */
-        .fmv-giveaway-link {
-            display: inline-block; /* Changed to inline-block for spacing */
-            padding: 5px 0;
-            color: #0079d3;
-            text-decoration: none;
-        }
-        .fmv-giveaway-link:hover {
-            text-decoration: underline;
-        }
-
-        /* Close Button */
-        .fmv-popup-close-btn {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 1.2em;
-            cursor: pointer;
-            line-height: 1;
-        }
-
-        /* Lists formatting */
-        #fmv-popup-body ul {
-            padding-left: 0;
-            margin-top: 5px;
-        }
-        #fmv-popup-body li {
-            list-style: none; /* Remove bullet points for main list */
-            margin-bottom: 10px;
-        }
-        #fmv-popup-body ul ul li {
-            list-style: disc; /* Use bullet points for link list */
-            margin-left: 20px;
-            margin-bottom: 5px;
-        }
-        .got-it-btn {
-            white-space: nowrap;
-        }
-        /* Footer Area */
-        #fmv-popup-footer {
-            padding: 5px 15px;
-            border-top: 1px solid #ddd;
-            text-align: right;
-            background-color: #f7f7f7;
-        }
-
-        /* Reset Button Style */
-        #fmv-reset-btn {
-            background-color: #f44336; /* Red */
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 12px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border-radius: 4px;
-        }
-        #fmv-reset-btn:hover {
-            background-color: #d32f2f;
-        }
-    `);
-
-
-    /**
-     * Helper function to wrap GM.xmlHttpRequest in a standard Promise.
-     */
     function gmXhrPromise(url) {
         return new Promise((resolve, reject) => {
             GM.xmlHttpRequest({
@@ -167,285 +57,432 @@
                     'User-Agent': USER_AGENT,
                     'Accept': 'application/json'
                 },
-                onload: function(response) {
+                onload: function (response) {
                     if (response.status === 200) {
                         resolve(response.responseText);
                     } else {
-                        reject(new Error(`API failed with status ${response.status}: ${response.statusText}`));
+                        console.error(`Reddit API failed with status ${response.status}`, response);
+                        reject(new Error(`Reddit API failed with status ${response.status}: ${response.statusText}`));
                     }
                 },
-                onerror: function(response) {
+                onerror: function (response) {
+                    console.error(`NETWORK ERROR during Reddit API fetch:`, response);
                     reject(new Error(`Network error during GM.xmlHttpRequest: ${response.responseText}`));
                 }
             });
         });
     }
 
-    /**
-     * Extracts required fields from the raw Reddit feed and formats them
-     * for insertion into the external database.
-     * @param {string} rawData - The raw JSON string from the Reddit API.
-     * @returns {Array<Object>} An array of post objects containing id, url, title, keyword, and stars.
-     */
-    function getSaveData(rawData) {
-        const data = JSON.parse(rawData);
-        const output = [];
+    // Renamed and fixed function (must be placed where your original sendFMBApiRequest was)
+    function sendFVMApiRequest(what, data = {}, method = 'POST') {
+        const isGet = (method.toUpperCase() === 'GET');
+        let url = API_TARGET_URL;
+        let payload = null;
+        let headers = {
+            'X-Api-Key': API_SECRET_KEY
+        };
 
-        // The data is located in data.data.children
-        data.data.children.forEach(child => {
-            const { title, url, name: id, created_utc } = child.data;
+        if (isGet) {
+            // GET Request (e.g., what=feed)
+            const params = new URLSearchParams(data);
+            url += `?what=${what}&${params.toString()}`;
+            console.log(['get', url])
+        } else {
+            // POST Request (sends data as standard form data)
+            headers['Content-Type'] = 'application/x-www-form-urlencoded';
 
-            // Use the existing parseTitle function to extract priority/stars and keyword
-            const parsed = parseTitle(title);
+            const requestObject = {what: what, ...data};
+            const params = new URLSearchParams();
 
-            if (parsed) {
-                const { priority, keyword } = parsed;
-
-                // Only save posts that successfully parsed and are valid giveaway entries
-                output.push({
-                    id: id,
-                    url: url,
-                    title: title,
-                    keyword: keyword,
-                    stars: priority, // 'priority' is the same as 'stars'
-                    created_utc: created_utc // Can be useful for server-side validation/logging
-                });
-            }
-        });
-
-        return output;
-    }
-
-    /**
-     * Sends the raw fetched data to the external API endpoint.
-     * @param {string} rawData - The raw JSON string from the Reddit API.
-     */
-    async function sendDataToApi(rawData) {
-        // Construct the payload as required: what='post' + the parsed datafeed
-        const payload = JSON.stringify({
-            what: 'post',
-            // Parse the raw JSON string to send the data as an object structure
-            payload: getSaveData(rawData)
-        });
-
-
-
-        GM.xmlHttpRequest({
-            method: 'POST',
-            url: API_TARGET_URL,
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Api-Key': API_SECRET_KEY // Required by your apihandler.php
-            },
-            data: payload,
-            onload: function(response) {
-                if (response.status === 200 || response.status === 201) {
-                    console.log('API Data Upload Success:', response.responseText);
-                } else {
-                    console.error(`API Data Upload Failed: ${response.status} - ${response.responseText}`);
+            for (const key in requestObject) {
+                if (requestObject.hasOwnProperty(key)) {
+                    // Ensure complex objects (like the 'post' payload) are stringified
+                    let value = requestObject[key];
+                    if (typeof value === 'object' && value !== null) {
+                        value = JSON.stringify(value);
+                    }
+                    params.append(key, value);
                 }
-            },
-            onerror: function(response) {
-                console.error('Network Error contacting external API:', response.error);
             }
+            payload = params.toString();
+        }
+        console.log(url);
+        return new Promise((resolve, reject) => {
+            GM.xmlHttpRequest({
+                method: method,
+                url: url,
+                headers: headers,
+                data: payload,
+
+                // --- CRITICAL: THE RESTORED ONLOAD LOGIC ---
+                onload: function (response) {
+                    console.log(`API_CALL: Received response for '${what}'. Status: ${response.status}`);
+
+                    try {
+                        // Even on success, the response must be parsed (e.g., status: success)
+                        // Added resilience for empty successful responses
+                        let jsonResponse;
+                        if (response.responseText && response.responseText.trim() !== "") {
+                            jsonResponse = JSON.parse(response.responseText);
+                        } else if (response.status >= 200 && response.status < 300) {
+                            jsonResponse = {status: 'success', message: 'Empty successful response received.'};
+                        } else {
+                            throw new Error("Empty or invalid response from API.");
+                        }
+
+                        if (response.status >= 200 && response.status < 300) {
+                            console.log(`API_CALL: Resolved successfully for '${what}'.`);
+                            resolve(jsonResponse); // Resolves the Promise!
+                        } else {
+                            console.error(`API FAILED (${what}): Status ${response.status}`, jsonResponse);
+                            reject(new Error(`API failed (${what}): ${response.status} - ${jsonResponse.error || response.responseText}`)); // Rejects the Promise!
+                        }
+                    } catch (e) {
+                        // This catches the JSON parsing error
+                        console.error(payload);
+                        console.error(`API RESPONSE PARSE FAILED (${what}):`, e, response.responseText);
+                        reject(new Error(`API response parse failed (${what}): ${response.status} - ${response.responseText}`)); // Rejects the Promise!
+                    }
+                },
+                // --- CRITICAL: THE RESTORED ONERROR LOGIC ---
+                onerror: function (response) {
+                    console.error(`API_CALL: Rejected (Network Error) for '${what}'.`, response);
+                    reject(new Error(`Network Error contacting external API (${what}): ${response.error || 'Check Network Tab for details.'}`)); // Rejects the Promise!
+                }
+            });
         });
     }
 
+    // --- Logic Functions ---
 
-    /**
-     * Fetches data using the GM.xmlHttpRequest API wrapped in a Promise.
-     * Now returns an object containing both the parsed data and the raw text.
-     */
-    async function fetchGiveawayFeed() {
-        try {
-            const responseText = await gmXhrPromise(TARGET_URL);
-
-            return {
-                data: JSON.parse(responseText),
-                rawData: responseText
-            };
-        } catch (error) {
-            console.error('Error fetching Reddit data:', error.message);
-            throw error; // Re-throw to be caught by the main function
+    const getStoredUserId = () => {
+        let userId = localStorage.getItem(USER_ID_STORAGE_KEY);
+        if (userId) {
+            CURRENT_USER_ID = userId.trim();
+            return CURRENT_USER_ID;
         }
-    }
+        return null;
+    };
 
     /**
-     * Parses the title to extract Priority and Keyword.
-     * @param {string} title - The post title.
-     * @returns {{priority: number, keyword: string} | null}
+     * Parses the title to extract Priority (Stars) and Keyword.
      */
     const parseTitle = (title) => {
         if (!title.startsWith(GIVEAWAY_PREFIX)) return null;
-
-        // Regex to capture: (Priority) + " Star(s) " + (Keyword) + " Sticker"
-        // The 's' in 'Star(s)' is now optional: (\\s*Star(s)?\\s+)
         const regex = new RegExp(`${GIVEAWAY_PREFIX}.*?(\\d+)\\s*Star(s)?\\s+(.+?)\\s+Sticker`, 'i');
         const match = title.match(regex);
 
         if (match && match.length >= 4) {
-            const priority = parseInt(match[1]); // Group 1: Priority
-            const keyword = match[3].trim();     // Group 3: Keyword
-
-            // Validate priority is between 1 and 5
-            if (priority >= 1 && priority <= 5 && keyword) {
-                return {priority, keyword};
+            const stars = parseInt(match[1]);
+            const keyword = match[3].trim();
+            if (stars >= 1 && stars <= 5 && keyword) {
+                return {stars, keyword};
             }
         }
         return null;
     };
 
-    // --- Storage Functions ---
-
-    const getKeywordStorage = () => {
-        try {
-            const data = localStorage.getItem(KEYWORD_STORAGE_KEY);
-            return data ? JSON.parse(data) : {};
-        } catch (e) {
-            console.error("Error reading keyword storage:", e);
-            return {};
-        }
-    };
-
-    const saveKeywordGot = (keyword) => {
-        const storage = getKeywordStorage();
-        storage[keyword] = new Date().toISOString();
-        localStorage.setItem(KEYWORD_STORAGE_KEY, JSON.stringify(storage));
-    };
-
-    const isKeywordExcluded = (keyword) => {
-        const storage = getKeywordStorage();
-        const timestamp = storage[keyword];
-
-        if (!timestamp) return false;
-
-        const timeDifference = Date.now() - new Date(timestamp).getTime();
-        return timeDifference < NINETY_DAYS_MS;
-    };
-
-    // --- Updated Link Storage Functions ---
-
-// Retrieves clicked link IDs and their timestamps
-    const getLinkStorage = () => {
-        try {
-            // Data structure: { id: timestamp_ms, id2: timestamp_ms, ... }
-            const data = localStorage.getItem(LINK_STORAGE_KEY);
-            // Clean up old links (optional, but good practice for storage)
-            const storage = data ? JSON.parse(data) : {};
-
-            // Clean links older than 90 days to prevent localStorage bloat
-            const now = Date.now();
-            for (const id in storage) {
-                if (now - storage[id] > NINETY_DAYS_MS) {
-                    delete storage[id];
-                }
-            }
-            return storage;
-        } catch (e) {
-            console.error("Error reading link storage:", e);
-            return {};
-        }
-    };
-
-// Saves a clicked link ID with a current timestamp (milliseconds)
-    const saveLinkClicked = (id) => {
-        const storage = getLinkStorage();
-        // Save the current timestamp in milliseconds
-        storage[id] = Date.now();
-        localStorage.setItem(LINK_STORAGE_KEY, JSON.stringify(storage));
-    };
-
-// Checks if a link has been clicked and returns the timestamp (or 0 if not clicked)
-    const getLinkClickTime = (id) => {
-        const storage = getLinkStorage();
-        return storage[id] || 0; // Returns timestamp in ms or 0
-    };
-
     /**
-     * Converts a Unix timestamp (seconds) to a DD/MM string.
-     * @param {number} utcTimestamp - The Unix timestamp in seconds.
-     * @returns {string} Formatted date string (DD/MM).
+     * NEW: Parses the raw Reddit JSON feed and cuts down the data to only essentials.
      */
-    const formatUtcToDdMm = (utcTimestamp) => {
-        // 1. Convert seconds to milliseconds
-        const date = new Date(utcTimestamp * 1000);
-
-        // 2. Get Day (add 1 if month is zero-indexed)
-        const day = date.getDate().toString().padStart(2, '0');
-
-        // 3. Get Month (add 1 as it is 0-indexed)
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-
-        return `${day}/${month}`;
-    };
-
-    // --- Processing and UI Logic ---
-
-    /**
-     * Fetches and processes the Reddit JSON feed.
-     * Includes logic to send the raw data to the external API.
-     * @returns {Object} Grouped data or null.
-     */
-    const fetchAndProcessFeed = async () => {
+    function processRawRedditData(jsonText) {
         try {
-            const result = await fetchGiveawayFeed(); // result = { data: parsed, rawData: string }
-            const data = result.data;
-            const rawData = result.rawData;
+            const rawFeed = JSON.parse(jsonText);
+            const children = rawFeed?.data?.children || [];
+            const minimalPosts = [];
 
-            // 1. Send data to external API (non-blocking)
-            sendDataToApi(rawData);
-
-            // Group the data: { priority: { keyword: [entries], ... }, ... }
-            const groupedData = {};
-            const currentTimeMs = Date.now();
-
-            data.data.children.forEach(child => {
-                const {title, url, name: id, created_utc} = child.data;
-
-                // --- (Your debugging line should go here, using formatUtcToDdMm(created_utc)) ---
-
-                // **24-HOUR FILTER REMOVED HERE**
-
-                const parsed = parseTitle(title);
+            children.forEach(child => {
+                const post = child.data;
+                const parsed = parseTitle(post.title);
 
                 if (parsed) {
-                    const {priority, keyword} = parsed;
-
-                    // 2. Keyword Exclusion Check
-                    if (isKeywordExcluded(keyword)) return;
-
-                    // 3. Grouping
-                    // Initialize structure if needed
-                    if (!groupedData[priority]) {
-                        groupedData[priority] = {};
-                    }
-                    if (!groupedData[priority][keyword]) {
-                        groupedData[priority][keyword] = [];
-                    }
-
-                    // ADDED created_utc to the final entry object
-                    groupedData[priority][keyword].push({link: url, id, created_utc});
+                    minimalPosts.push({
+                        id: post.name, // Reddit prefix t3_...
+                        url: post.url,
+                        title: post.title,
+                        keyword: parsed.keyword,
+                        stars: parsed.stars,
+                        created_utc: post.created_utc
+                    });
                 }
             });
 
-            return groupedData;
-
-        } catch (error) {
-            console.error("Failed to fetch or process Reddit feed:", error);
-            // Handle error display in the main init function
-            return null;
+            console.log(`Processed ${minimalPosts.length} giveaway posts for API ingestion.`);
+            return minimalPosts;
+        } catch (e) {
+            console.error('Failed to process raw Reddit JSON:', e);
+            throw new Error('Data processing failed.');
         }
-    };
+    }
 
 
     /**
-     * Injects the necessary HTML structure for the pop-up into the Reddit page.
-     * @returns {HTMLElement | null} The body element of the pop-up.
+     * Fetches the raw Reddit JSON feed, processes it, and POSTs the minimal data to the API.
      */
+    async function ingestRedditFeed() {
+        try {
+            const responseText = await gmXhrPromise(REDDIT_FEED_URL);
+
+            // --- CRITICAL CHANGE: Process data before sending ---
+            const minimalData = processRawRedditData(responseText);
+
+            const apiData = {
+                payload: minimalData // Send the array of clean objects
+            };
+
+            console.log("API Ingestion Request Payload:", minimalData);
+
+            // The API expects a 'payload' key containing the array of minimal post data
+            sendFVMApiRequest('post', minimalData, 'POST');
+
+        } catch (error) {
+            console.error('CRITICAL FAILURE: Reddit or API POST (Ingestion) failed.', error.message);
+            throw new Error(`Ingestion failed: ${error.message}`);
+        }
+    }
+
+    // Remaining functions (fetchUserFeed, fetchAndProcessFeed, sendKeywordGot, sendLinkStatus)
+    // remain the same as they correctly call sendFVMApiRequest.
+
+    async function fetchUserFeed() {
+        try {
+            const response = await sendFVMApiRequest('feed', {user: CURRENT_USER_ID}, 'GET');
+            console.log(['fetchUserFeed', response, response.data]);
+            //return response.data;
+            return response;
+        } catch (error) {
+            console.error('Error fetching user feed (GET):', error.message);
+            throw error;
+        }
+    }
+
+    const fetchAndProcessFeed = async () => {
+        let ingestionSucceeded = false;
+
+        // 1. Attempt Ingestion (POST request) - Make this non-critical
+        try {
+            console.log("F&PF: Starting ingestion...");
+            await ingestRedditFeed();
+            ingestionSucceeded = true;
+            console.log("F&PF: Ingestion complete. Starting feed fetch (GET request)...");
+        } catch (e) {
+            console.warn("F&PF: Warning: Reddit ingestion failed. Proceeding with old feed retrieval.", e);
+            // ingestionSucceeded remains false
+        }
+
+        // 2. Attempt Feed Retrieval (GET request) - This remains critical
+        try {
+            const groupedData = await fetchUserFeed();
+            console.log("F&PF: Feed fetch complete.");
+
+            // Return the data AND the ingestion status flag
+            return {
+                data: groupedData,
+                isUpToDate: ingestionSucceeded // Will be false if ingestRedditFeed failed
+            };
+
+        } catch (error) {
+            console.error("Failed to fetch user feed (GET request failed):", error);
+            // Return null if the final GET request fails, which triggers the critical message
+            return null;
+        }
+    }
+
+    const sendKeywordGot = async (keyword) => {
+        try {
+            await sendFVMApiRequest('gotit', {user: CURRENT_USER_ID, keyword: keyword}, 'POST');
+            console.log(`Keyword '${keyword}' marked as collected via API.`);
+        } catch (error) {
+            console.error('Error sending gotit status to API:', error.message);
+            alert(`Failed to mark keyword as collected: ${keyword}. Check console.`);
+        }
+    };
+
+    const sendLinkStatus = async (postId, status) => {
+        try {
+            await sendFVMApiRequest('link', {user: CURRENT_USER_ID, post_id: postId, status: status}, 'POST');
+            console.log(`Link ID '${postId}' updated to status '${status}' via API.`);
+        } catch (error) {
+            console.error('Error sending link status to API:', error.message);
+            alert(`Failed to update link status: ${postId}. Check console.`);
+        }
+    };
+
+    // --- UI Logic (functions handleUsernameSubmit, injectPopupHtml, renderPopupContent, attachEventListeners remain the same) ---
+
+    const attachEventListeners = () => {
+        document.querySelectorAll('.got-it-btn').forEach(button => {
+            button.addEventListener('click', async (event) => {
+                const keyword = event.target.dataset.keyword;
+                if (keyword) {
+                    try {
+                        // 1. Call the API to mark the keyword as collected
+                        await sendKeywordGot(keyword);
+
+                        // 2. Find the current <li> containing the keyword and button
+                        const keywordLi = event.target.closest('li');
+
+                        // 3. Find the immediate next sibling, which is the <ul> of links for this keyword
+                        const linksUl = keywordLi.nextElementSibling;
+
+                        // 4. Remove the entire keyword group from the DOM
+                        if (linksUl && linksUl.tagName === 'UL') {
+                            linksUl.remove(); // Remove the list of links
+                        }
+                        keywordLi.remove(); // Remove the keyword and "Got It!" button
+
+                        // NOTE: If you also want to update the total count in the header,
+                        // you would need to recalculate and update the header text here.
+
+                    } catch (error) {
+                        // Handle the case where the API call failed (if sendKeywordGot throws)
+                        console.error("Failed to mark keyword as collected.", error);
+                        alert("Could not mark sticker as collected. Check the console for details.");
+                    }
+                }
+            });
+        });
+
+        document.querySelectorAll('.giveaway-link').forEach(link => {
+            link.addEventListener('click', async (event) => {
+                const id = event.target.dataset.id;
+                const currentStatus = event.target.dataset.status;
+                const createdUtc = parseInt(event.target.dataset.createdutc);
+
+                if (!id || !createdUtc) return;
+
+                let nextStatus = currentStatus;
+                const currentTimeSeconds = Math.floor(Date.now() / 1000);
+
+                if (currentStatus === 'null') {
+                    nextStatus = 'active';
+                } else if (currentStatus === 'active' && (currentTimeSeconds - createdUtc > TWENTY_FOUR_HOURS_S)) {
+                    nextStatus = 'done';
+                }
+
+                if (nextStatus !== currentStatus) {
+                    await sendLinkStatus(id, nextStatus);
+                    event.target.dataset.status = nextStatus;
+
+                    if (nextStatus === 'done') {
+                        event.target.style.textDecoration = 'line-through';
+                        event.target.style.color = '#888';
+                        event.target.textContent = event.target.textContent.replace('(active)', '(done)');
+                    } else if (nextStatus === 'active') {
+                        event.target.style.color = '#f7a01d';
+                        event.target.textContent = event.target.textContent.replace('(null)', '(active)');
+                    }
+                }
+            });
+        });
+    };
+
+    function handleUsernameSubmit() {
+        const inputField = document.getElementById('fmv-username-input');
+        const username = inputField.value.trim();
+
+        if (username.length > 2) {
+            localStorage.setItem(USER_ID_STORAGE_KEY, username);
+            CURRENT_USER_ID = username;
+            initApp(true);
+        } else {
+            alert("Please enter a username with at least 3 characters.");
+        }
+    }
+
     function injectPopupHtml() {
         let popup = document.getElementById('fmv-giveaways-popup');
-        if (popup) return document.getElementById('fmv-popup-body');
 
+        if (popup) {
+            const inputArea = document.getElementById('fmv-user-input-area');
+            if (inputArea) {
+                return {
+                    popup: popup,
+                    inputArea: inputArea,
+                    body: document.getElementById('fmv-popup-body'),
+                    header: document.getElementById('fmv-popup-header') // <-- ADD THIS LINE
+                };
+            } else {
+                popup.remove();
+                popup = null;
+            }
+        }
+
+        // --- Inject Styles ---
+        addStyle(`
+        #fmv-giveaways-popup {
+            z-index: 10000;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            background: #f9f9f9;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            display: none;
+        }
+        #fmv-popup-header {
+            background-color: #E2852E;
+            color: white;
+            padding: 8px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+        #fmv-popup-body {
+            padding: 15px 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        #fmv-user-input-area {
+            padding: 15px 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        #fmv-user-input-area input[type="text"] {
+            width: 60%;
+            padding: 5px;
+            margin-right: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #fmv-user-input-area button {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #5cb85c;
+            color: white;
+            cursor: pointer;
+        }
+        #fmv-popup-footer {
+            border-top: 1px solid #eee;
+            padding: 8px 10px;
+            text-align: right;
+        }
+        .fmv-popup-close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2em;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .got-it-btn {
+            background-color: #5a5a8a;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        `);
+
+        // --- Create and Inject HTML ---
         popup = document.createElement('div');
         popup.id = 'fmv-giveaways-popup';
         popup.innerHTML = `
@@ -453,76 +490,65 @@
             <span>Sticker Giveaways</span>
             <button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>
         </div>
-        <div id="fmv-popup-body">
-            <p>Loading...</p>
+
+        <div id="fmv-user-input-area">
+            <p style="margin-top: 0; font-size: 0.9em; color: #555;">
+                Enter a unique username (e.g., Reddit ID) to start tracking:
+            </p>
+            <input type="text" id="fmv-username-input" placeholder="Your Username" value=""/>
+            <button id="fmv-submit-user-btn">Start</button>
         </div>
+
+        <div id="fmv-popup-body">
+            <p>Loading giveaways...</p>
+        </div>
+
         <div id="fmv-popup-footer">
-            <button id="fmv-reset-btn" title="Clears all stored 'Got It' keywords and link click history.">Reset Data</button>
+            <button id="fmv-reset-btn" title="Clears the locally stored username. Use this if the script is not tracking correctly.">Clear User ID</button>
         </div>
     `;
         document.body.appendChild(popup);
 
-        // Attach close listener
+        // --- Attach UI Listeners ---
+
         document.getElementById('fmv-close-btn').addEventListener('click', () => {
             popup.style.display = 'none';
         });
 
-        // Attach the new Reset listener here
-        document.getElementById('fmv-reset-btn').addEventListener('click', () => {
-            if (confirm("Are you sure you want to reset ALL Sticker Giveaway data (keywords and link history)?")) {
-                clearLocalStorageData();
-                initApp(); // Re-initialize to reload with cleared data
+        document.getElementById('fmv-submit-user-btn').addEventListener('click', handleUsernameSubmit);
+        document.getElementById('fmv-username-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleUsernameSubmit();
             }
         });
 
-        return document.getElementById('fmv-popup-body');
+        document.getElementById('fmv-reset-btn').addEventListener('click', () => {
+            if (confirm("Are you sure you want to clear your locally stored User ID?")) {
+                localStorage.removeItem(USER_ID_STORAGE_KEY);
+                location.reload();
+            }
+        });
+
+        return {
+            popup: popup,
+            inputArea: document.getElementById('fmv-user-input-area'),
+            body: document.getElementById('fmv-popup-body'),
+            header: document.getElementById('fmv-popup-header') // <-- ADD THIS LINE
+        };
     }
 
-    /**
-     * Attaches event listeners to the buttons and links.
-     */
-    const attachEventListeners = () => {
-        // 1. "Got It" button listener
-        document.querySelectorAll('.got-it-btn').forEach(button => {
-            button.addEventListener('click', (event) => {
-                const keyword = event.target.dataset.keyword;
-                if (keyword) {
-                    saveKeywordGot(keyword);
-                    initApp(); // Re-run the app to hide the collected keyword
-                }
-            });
-        });
-
-        // 2. Link click listener (strikethrough and tracking)
-        document.querySelectorAll('.giveaway-link').forEach(link => {
-            link.addEventListener('click', (event) => {
-                const id = event.target.dataset.id;
-                if (id) {
-                    saveLinkClicked(id);
-                    // Apply strikethrough instantly
-                    event.target.style.textDecoration = 'line-through';
-                    event.target.style.color = '#888';
-                }
-                // Allow the link to open normally
-            });
-        });
-    };
-
-    /**
-     * Populates the pop-up with the fetched and processed data,
-     * implementing the New/Active/Finished logic and filtering.
-     * @param {Object} groupedData - Grouped data by priority and keyword.
-     */
-    function renderPopupContent(groupedData) {
-        const popupBody = injectPopupHtml();
-        if (!popupBody) return;
+    function renderPopupContent(groupedData, isUpToDate) {
+        const uiElements = injectPopupHtml();
+        const popupBody = uiElements.body;
+        const header = uiElements.header; // <-- Added header reference for later use
+        const popup = uiElements.popup;
 
         popupBody.innerHTML = '';
+        console.log(['renderPopupContent', groupedData, isUpToDate]);
 
         let totalGiveaways = 0;
         let html = '';
         const priorities = Object.keys(groupedData).sort((a, b) => b - a);
-        const currentTimeMs = Date.now();
 
         priorities.forEach(priority => {
             const keywords = groupedData[priority];
@@ -531,127 +557,133 @@
 
             Object.keys(keywords).forEach(keyword => {
                 const entries = keywords[keyword];
+                if (entries.length === 0) return;
 
-                // Collect entries that should be displayed
-                const visibleEntries = [];
-
-                // Links for that keyword
-                entries.forEach(entry => {
-                    const clickTimeMs = getLinkClickTime(entry.id);
-                    const postTimeMs = entry.created_utc * 1000;
-
-                    // Calculate current age of the post
-                    const currentPostAgeMs = currentTimeMs - postTimeMs;
-                    const isPostOlderThan24h = currentPostAgeMs >= TWENTY_FOUR_HOURS_MS;
-
-                    // CRUCIAL NEW CHECK: Has the link been clicked AFTER it passed the 24-hour mark?
-                    // This determines if the user has acknowledged the "Finished" status.
-                    const isClickFinishedAck = clickTimeMs > 0 && (clickTimeMs >= postTimeMs + TWENTY_FOUR_HOURS_MS);
-
-                    let linkStatus = 'New';
-                    let linkStyle = '';
-                    let linkLabel = 'Link to Giveaway';
-
-                    // 1. --- HIDING RULE ---
-                    // Hide if it's older than 24h AND the user has clicked it since it passed the 24h mark.
-                    if (isPostOlderThan24h && isClickFinishedAck) {
-                        return; // DO NOT RENDER (Finished and Acknowledged)
-                    }
-
-                    // 2. --- RENDERING RULES ---
-                    if (isPostOlderThan24h) {
-                        // Post is older than 24h, and not yet acknowledged (click occurred before aging, or no click at all)
-                        linkStatus = 'Finished';
-                        linkStyle = 'text-decoration: line-through; color: #888;';
-                        linkLabel = 'Finished (Older than 24h)';
-                    } else if (clickTimeMs > 0) {
-                        // Post is within 24h AND has been clicked
-                        linkStatus = 'Active';
-                        linkStyle = 'color: #f7a01d; font-weight: bold;'; // Amber/Orange color
-                    }
-
-                    // If we reached this point, the link is visible
-                    visibleEntries.push({ entry, linkStatus, linkStyle, linkLabel });
-                }); // End entries.forEach
-
-                // If there are no visible entries for this keyword, skip rendering the keyword block
-                if (visibleEntries.length === 0) return;
-
-                // Render the keyword block header
                 html += `<li style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start;">
                         <strong style="flex-grow: 1;">${keyword}</strong>
                         <button class="got-it-btn" data-keyword="${keyword}">Got It!</button>
                     </li>
                     <ul style="list-style: disc; margin-left: 10px;">`;
 
-                // Render the visible links
-                visibleEntries.forEach(({ entry, linkStatus, linkStyle, linkLabel }) => {
+                entries.forEach(entry => {
                     totalGiveaways++;
 
+                    // --- HTML GENERATION (THIS IS ALL THAT SHOULD BE IN THIS LOOP) ---
+                    let linkStatus = entry.status || 'null';
+                    let linkStyle = '';
+                    let linkLabel = 'Link to Giveaway';
+
+                    switch (linkStatus) {
+                        case 'active':
+                            linkStyle = 'color: #f7a01d; font-weight: bold;';
+                            linkLabel = 'Active';
+                            break;
+                        case 'done':
+                            linkStyle = 'text-decoration: line-through; color: #888;';
+                            linkLabel = 'Entered (Finished)';
+                            break;
+                        case 'null':
+                        default:
+                            linkStatus = 'null';
+                            linkLabel = 'New Giveaway';
+                            break;
+                    }
+
                     html += `<li style="margin-bottom: 3px;">
-                            <a href="${entry.link}" target="_blank" class="fmv-giveaway-link giveaway-link" data-id="${entry.id}" 
-                               style="${linkStyle}">
-                                ${linkLabel} (${linkStatus})
-                            </a>
-                        </li>`;
+                                <a href="${entry.url}" target="_blank"
+                                   class="fmv-giveaway-link giveaway-link"
+                                   data-id="${entry.id}"
+                                   data-status="${linkStatus}"
+                                   data-createdutc="${entry.created_utc}"
+                                   style="${linkStyle}">
+                                    ${linkLabel} (${linkStatus})
+                                </a>
+                            </li>`;
+                    // --- END HTML GENERATION ---
                 });
                 html += '</ul>';
             });
             html += '</ul>';
         });
 
-        const header = document.getElementById('fmv-popup-header');
-        const popup = document.getElementById('fmv-giveaways-popup');
+        // --- FINAL DOM UPDATE AND STATUS MESSAGE LOGIC (RESTORED/CORRECTED) ---
 
         if (totalGiveaways === 0) {
-            popupBody.innerHTML = '<p>No new or active giveaways found.</p>';
-            header.innerHTML = '<span>Sticker Giveaways (0)</span><button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>';
+            let noGiveawaysMessage = 'No new or active giveaways found.';
+
+            // State 2 (No items found AND ingestion failed) - refine the message
+            if (!isUpToDate) {
+                noGiveawaysMessage = 'No current sticker giveaways found. (Feed may be out of date.)';
+            }
+
+            popupBody.innerHTML = `<p style="text-align: center; margin-top: 20px;">${noGiveawaysMessage}</p>`;
+            header.innerHTML = `<span>Sticker Giveaways (0)</span><button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>`;
         } else {
             popupBody.innerHTML = html;
-            header.innerHTML = `<span>Sticker Giveaways (${totalGiveaways})</span><button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>`;
+
+            let headerTitle = `<span>Sticker Giveaways (${totalGiveaways})</span>`;
+
+            // State 2: Show the "may not be shown" warning message
+            if (!isUpToDate) {
+                headerTitle = `<span style="color: #f7a01d; font-weight: bold; font-size: 1.1em; padding-right: 15px;">Latest Giveaways may not be shown</span>`;
+            }
+
+            header.innerHTML = `${headerTitle}<button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>`;
             attachEventListeners();
         }
 
-        // Re-attach close listener
-        document.getElementById('fmv-close-btn').addEventListener('click', () => {
-            popup.style.display = 'none';
-        });
-
-        // Show the pop-up once content is ready
         popup.style.display = 'block';
+
+
+
+}
+
+/**
+ * Main function to initialize and run the application.
+ */
+const initApp = async (skipUserIdCheck = false) => {
+    const uiElements = injectPopupHtml();
+
+    if (!uiElements || !uiElements.body) {
+        console.error("Failed to inject or retrieve UI elements.");
+        return;
     }
 
-    /**
-     * Clears all data stored by the userscript in localStorage.
-     */
-    const clearLocalStorageData = () => {
-        localStorage.removeItem(KEYWORD_STORAGE_KEY);
-        localStorage.removeItem(LINK_STORAGE_KEY);
-        console.log("Sticker Giveaway userscript data cleared.");
-    };
+    if (!skipUserIdCheck && !getStoredUserId()) {
+        uiElements.inputArea.style.display = 'block';
+        uiElements.body.innerHTML = '<p>Please enter your username above to view the giveaway feed.</p>';
+        uiElements.popup.style.display = 'block';
+        return;
+    }
 
-    /**
-     * Main function to initialize and run the application.
-     */
-    const initApp = async () => {
-        // Inject the empty popup structure immediately
-        injectPopupHtml();
+    uiElements.inputArea.style.display = 'none';
+    uiElements.body.innerHTML = '<p>Loading giveaways...</p>';
+    uiElements.popup.style.display = 'block';
 
-        const groupedData = await fetchAndProcessFeed();
+    //const groupedData = await fetchAndProcessFeed();
+    //console.log(groupedData);
 
-        if (groupedData) {
-            renderPopupContent(groupedData);
-        } else {
-            // Error case handled by fetchAndProcessFeed
-            const popupBody = document.getElementById('fmv-popup-body');
-            if(popupBody) {
-                popupBody.innerHTML = `<p style="color:red;">Error loading feed. Check browser console.</p>`;
-                document.getElementById('fmv-giveaways-popup').style.display = 'block';
-            }
-        }
-    };
+    // if (groupedData) {
+    //     renderPopupContent(groupedData);
+    // } else {
+    //     uiElements.body.innerHTML = `<p style="color:red;">Error loading feed. Check browser console.</p>`;
+    // }
 
-    // Initialize on page load
-    initApp();
+    const feedResult = await fetchAndProcessFeed();
 
-})();
+    if (feedResult && feedResult.data) {
+        // State 1 & 2: API Feed is available. Always render the data.
+        // The renderPopupContent handles the "may not be shown" warning based on isUpToDate.
+        renderPopupContent(feedResult.data, feedResult.isUpToDate);
+
+    } else {
+        // State 3: The API GET request failed (feedResult is null). Show the critical error.
+        uiElements.body.innerHTML = `<p style="color:red; font-size: 1.2em; text-align: center; padding: 20px;">Latest Giveaways didn't load.</p>`; // <-- CORRECTED MESSAGE
+    }
+};
+
+// Initialize on page load
+initApp();
+
+})
+();
