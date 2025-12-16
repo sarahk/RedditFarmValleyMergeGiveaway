@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up (API-Driven)
 // @namespace    http://tampermonkey.net/
-// @version      2.7
+// @version      2.8
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -566,38 +566,62 @@
                 entries.forEach(entry => {
                     totalGiveaways++;
 
-                    // --- HTML GENERATION (THIS IS ALL THAT SHOULD BE IN THIS LOOP) ---
-                    let linkStatus = entry.status || 'null';
-                    let linkStyle = '';
-                    let linkLabel = 'Link to Giveaway';
+                    // --- TIME CALCULATION LOGIC ---
+                    // TWENTY_FOUR_HOURS_S is defined globally (around line 34)
+                    const expirationTime = entry.created_utc + TWENTY_FOUR_HOURS_S;
+                    const currentTime = Math.floor(Date.now() / 1000);
+                    const timeRemainingSeconds = expirationTime - currentTime;
 
-                    switch (linkStatus) {
-                        case 'active':
+                    let timeRemainingText;
+                    let linkStyle = '';
+                    let timeTextStyle = '#333'; // Default text color for time
+
+                    if (timeRemainingSeconds > 0) {
+                        // Giveaway is active (time remaining)
+                        const hours = Math.floor(timeRemainingSeconds / 3600);
+                        const minutes = Math.floor((timeRemainingSeconds % 3600) / 60);
+
+                        if (hours > 0) {
+                            timeRemainingText = `${hours}h ${minutes}m`;
+                        } else {
+                            // If less than an hour, show minutes only, highlight in red if less than 15m
+                            if (minutes < 15) {
+                                timeTextStyle = '#a00';
+                            }
+                            timeRemainingText = `${minutes}m remaining`;
+                        }
+
+                        // Use linkStyle to indicate "Active" status (if marked by user)
+                        if (entry.status === 'active') {
                             linkStyle = 'color: #f7a01d; font-weight: bold;';
-                            linkLabel = 'Active';
-                            break;
-                        case 'done':
-                            linkStyle = 'text-decoration: line-through; color: #888;';
-                            linkLabel = 'Entered (Finished)';
-                            break;
-                        case 'null':
-                        default:
-                            linkStatus = 'null';
-                            linkLabel = 'New Giveaway';
-                            break;
+                        } else {
+                            linkStyle = ''; // Default for unclicked links
+                        }
+
+                    } else {
+                        // Giveaway is expired
+                        timeRemainingText = 'EXPIRED';
+                        //linkStyle = 'text-decoration: line-through; color: #888;';
+                        timeTextStyle = '#a00'; // Highlight expired status
                     }
 
-                    html += `<li style="margin-bottom: 3px;">
+                    const linkStatus = entry.status || 'null'; // Keep status for the data-attribute
+
+                    // --- UPDATED HTML GENERATION ---
+                    html += `<li style="margin-bottom: 3px; display: flex; align-items: baseline;">
                                 <a href="${entry.url}" target="_blank"
                                    class="fmv-giveaway-link giveaway-link"
                                    data-id="${entry.id}"
                                    data-status="${linkStatus}"
                                    data-createdutc="${entry.created_utc}"
                                    style="${linkStyle}">
-                                    ${linkLabel} (${linkStatus})
+                                    Link to Giveaway
                                 </a>
+                                <span style="font-size: 0.9em; margin-left: 10px; color: ${timeTextStyle};">
+                                    (${timeRemainingText})
+                                </span>
                             </li>`;
-                    // --- END HTML GENERATION ---
+                    // --- END UPDATED HTML GENERATION ---
                 });
                 html += '</ul>';
             });
