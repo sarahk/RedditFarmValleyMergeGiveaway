@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up (API-Driven)
 // @namespace    http://tampermonkey.net/
-// @version      2.11
+// @version      2.12
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -524,7 +524,7 @@
         console.log(document.getElementById('fmv-close-btn'));
         document.getElementById('fmv-close-btn').addEventListener('click', () => {
             console.log('closing popup');
-            popup.style.display = 'none';
+            document.getElementById('fmv-giveaways-popup').style.display = 'none';
         });
 
         document.getElementById('fmv-submit-user-btn').addEventListener('click', handleUsernameSubmit);
