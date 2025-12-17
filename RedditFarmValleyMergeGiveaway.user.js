@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up (API-Driven)
 // @namespace    http://tampermonkey.net/
-// @version      2.10
+// @version      2.11
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -309,6 +309,7 @@
     // --- UI Logic (functions handleUsernameSubmit, injectPopupHtml, renderPopupContent, attachEventListeners remain the same) ---
 
     const attachEventListeners = () => {
+        console.log('function: attachEventListeners');
         document.querySelectorAll('.got-it-btn').forEach(button => {
             button.addEventListener('click', async (event) => {
                 const keyword = event.target.dataset.keyword;
@@ -507,8 +508,19 @@
     `;
         document.body.appendChild(popup);
 
+        attachUIListeners();
+
+        return {
+            popup: popup,
+            inputArea: document.getElementById('fmv-user-input-area'),
+            body: document.getElementById('fmv-popup-body'),
+            header: document.getElementById('fmv-popup-header') // <-- ADD THIS LINE
+        };
+    }
+
+    function attachUIListeners() {
         // --- Attach UI Listeners ---
-        console.log('Attach UI Listeners');
+        console.log('function attachUIListeners');
         console.log(document.getElementById('fmv-close-btn'));
         document.getElementById('fmv-close-btn').addEventListener('click', () => {
             console.log('closing popup');
@@ -528,13 +540,6 @@
                 location.reload();
             }
         });
-
-        return {
-            popup: popup,
-            inputArea: document.getElementById('fmv-user-input-area'),
-            body: document.getElementById('fmv-popup-body'),
-            header: document.getElementById('fmv-popup-header') // <-- ADD THIS LINE
-        };
     }
 
     function renderPopupContent(groupedData, isUpToDate) {
@@ -654,6 +659,7 @@
 
             header.innerHTML = `${headerTitle}<button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>`;
             attachEventListeners();
+            attachUIListeners();
         }
 
         popup.style.display = 'block';
