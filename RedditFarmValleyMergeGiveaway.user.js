@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.14
+// @version      2.15
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -10,6 +10,9 @@
 // @match        https://www.reddit.com/r/FarmMergeValley/*
 // @match        https://sh.reddit.com/r/ClubSusan/*
 // @match        https://www.reddit.com/r/ClubSusan/*
+// @connect      reddit.com
+// @connect      www.reddit.com
+// @connect      sh.reddit.com
 // @grant        GM.xmlHttpRequest
 // @grant        GM_addStyle
 // @run-at       document-idle
