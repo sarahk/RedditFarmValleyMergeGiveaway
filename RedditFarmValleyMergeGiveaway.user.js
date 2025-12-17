@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.13
+// @version      2.14
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -49,30 +49,50 @@
     }
 
     function gmXhrPromise(url) {
-        return new Promise((resolve, reject) => {
-            GM.xmlHttpRequest({
-                method: 'GET',
-                url: url,
-                headers: {
-                    'User-Agent': USER_AGENT,
-                    'Accept': 'application/json'
-                },
-                timeout: 15000,
-                onload: function (response) {
-                    if (response.status === 200) {
-                        resolve(response.responseText);
-                    } else {
-                        console.error(`Reddit API failed with status ${response.status}`, response);
-                        reject(new Error(`Reddit API failed with status ${response.status}: ${response.statusText}`));
-                    }
-                },
-                onerror: function (response) {
-                    console.error(`NETWORK ERROR during Reddit API fetch:`, response);
-                    reject(new Error(`Network error during GM.xmlHttpRequest: ${response.responseText}`));
+    return new Promise((resolve, reject) => {
+        console.log(`[XHR] Starting request to: ${url}`);
+        
+        const request = GM.xmlHttpRequest({
+            method: 'GET',
+            url: url,
+            headers: {
+                'User-Agent': USER_AGENT,
+                'Accept': 'application/json'
+            },
+            // Reduce internal timeout to see if it triggers
+            timeout: 10000, 
+            
+            // Capture the state change to see where it gets stuck
+            onreadystatechange: function(response) {
+                console.log(`[XHR] State changed to: ${response.readyState}`);
+            },
+
+            onload: function(response) {
+                console.log(`[XHR] Load received with status: ${response.status}`);
+                if (response.status === 200) {
+                    resolve(response.responseText);
+                } else {
+                    reject(new Error(`Status ${response.status}: ${response.statusText}`));
                 }
-            });
+            },
+
+            onerror: function(err) {
+                console.error(`[XHR] Fatal Error:`, err);
+                reject(err);
+            },
+
+            ontimeout: function() {
+                console.error(`[XHR] Request timed out internally.`);
+                reject(new Error("Internal GM Timeout"));
+            },
+
+            onabort: function() {
+                console.warn(`[XHR] Request was aborted.`);
+                reject(new Error("Request Aborted"));
+            }
         });
-    }
+    });
+}
 
     // Renamed and fixed function (must be placed where your original sendFMBApiRequest was)
     function sendFVMApiRequest(what, data = {}, method = 'POST') {
