@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up (API-Driven)
 // @namespace    http://tampermonkey.net/
-// @version      2.8
+// @version      2.9
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -229,9 +229,9 @@
             const minimalData = processRawRedditData(responseText);
 
             console.log("API Ingestion Request Payload:", minimalData);
-
+            const savedFeed = {payload: minimalData};
             // The API expects a 'payload' key containing the array of minimal post data
-            sendFVMApiRequest('post', minimalData, 'POST');
+            sendFVMApiRequest('post', savedFeed, 'POST');
 
         } catch (error) {
             console.error('CRITICAL FAILURE: Reddit or API POST (Ingestion) failed.', error.message);
