@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.15
+// @version      2.16
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -15,11 +15,14 @@
 // @connect      sh.reddit.com
 // @grant        GM.xmlHttpRequest
 // @grant        GM_addStyle
+// @grant        unsafeWindow
 // @run-at       document-idle
+// @sandbox      raw
 // ==/UserScript==
 
 (function () {
     'use strict';
+    console.log(window.IITC);
 
     // --- Configuration ---
     const REDDIT_FEED_URL = 'https://www.reddit.com/r/FarmMergeValley/search.json?q=flair_name%3A%22%F0%9F%8E%81+Raffles%2FGiveaways%22&restrict_sr=1&sort=new&t=month';
