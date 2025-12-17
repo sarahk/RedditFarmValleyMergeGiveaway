@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.16
+// @version      2.17
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -17,7 +17,7 @@
 // @grant        GM_addStyle
 // @grant        unsafeWindow
 // @run-at       document-idle
-// @sandbox      raw
+// @sandbox      js
 // ==/UserScript==
 
 (function () {
@@ -56,45 +56,44 @@
 
     function gmXhrPromise(url) {
     return new Promise((resolve, reject) => {
-        console.log(`[XHR] Starting request to: ${url}`);
-        
-        const request = GM.xmlHttpRequest({
+        console.log(`[XHR] Initializing request to: ${url}`);
+
+        // We use the underscore version for better compatibility with older headers
+        const xhr = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest : GM.xmlHttpRequest;
+
+        xhr({
             method: 'GET',
             url: url,
             headers: {
-                'User-Agent': USER_AGENT,
-                'Accept': 'application/json'
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache'
             },
-            // Reduce internal timeout to see if it triggers
-            timeout: 10000, 
+            timeout: 10000,
             
-            // Capture the state change to see where it gets stuck
-            onreadystatechange: function(response) {
-                console.log(`[XHR] State changed to: ${response.readyState}`);
-            },
-
+            // This will tell us if the request actually leaves the browser
+            onprogress: (res) => console.log(`[XHR] Progress: ${res.loaded} bytes received`),
+            
             onload: function(response) {
-                console.log(`[XHR] Load received with status: ${response.status}`);
+                console.log(`[XHR] Status Code: ${response.status}`);
                 if (response.status === 200) {
                     resolve(response.responseText);
+                } else if (response.status === 301 || response.status === 302) {
+                    console.error("[XHR] Redirect detected. Reddit is trying to move the URL.");
+                    reject(new Error("Redirect Blocked"));
                 } else {
-                    reject(new Error(`Status ${response.status}: ${response.statusText}`));
+                    reject(new Error(`Reddit API Error: ${response.status}`));
                 }
             },
-
-            onerror: function(err) {
-                console.error(`[XHR] Fatal Error:`, err);
-                reject(err);
+            
+            onerror: function(response) {
+                console.error("[XHR] Network-level error. This usually means a CORS or CSP block.");
+                reject(response);
             },
-
+            
             ontimeout: function() {
-                console.error(`[XHR] Request timed out internally.`);
-                reject(new Error("Internal GM Timeout"));
-            },
-
-            onabort: function() {
-                console.warn(`[XHR] Request was aborted.`);
-                reject(new Error("Request Aborted"));
+                console.error("[XHR] Request timed out at the extension level.");
+                reject(new Error("Timeout"));
             }
         });
     });
