@@ -323,33 +323,55 @@
 
   // 3. Update runBackgroundTasks with a proper for...of loop
   async function runBackgroundTasks() {
-    try {
-      // Fetch the keyword list from your API
-      const response = await sendFVMApiRequest("keywords", {}, "GET");
+    async function runBackgroundTasks() {
+      const LAST_RUN_KEY = "fmv_last_background_run";
+      const ONE_HOUR_MS = 60 * 60 * 1000;
+      const now = Date.now();
+      const lastRun = localStorage.getItem(LAST_RUN_KEY);
 
-      // Ensure we have an array to loop through
-      const keywords = Array.isArray(response) ? response : response.data || [];
+      // Only run if there's no timestamp OR if current time is > 1 hour since last run
+      if (!lastRun || now - parseInt(lastRun) > ONE_HOUR_MS) {
+        try {
+          console.log("Background Tasks: Starting scheduled hourly update...");
 
-      if (keywords.length > 0) {
-        console.log(`Processing ${keywords.length} keywords...`);
+          const response = await sendFVMApiRequest("keywords", {}, "GET");
+          const keywords = Array.isArray(response)
+            ? response
+            : response.data || [];
 
-        // USE FOR...OF to ensure sequential, awaitable execution
-        for (const keyword of keywords) {
-          let safeKeyword = encodeURIComponent(keyword.trim());
-          const searchUrl = `https://www.reddit.com/r/FarmMergeValley/search.json?q=${safeKeyword}&restrict_sr=1&sort=new&t=month`;
-          await getRedditFeed(searchUrl);
+          if (keywords.length > 0) {
+            for (const keyword of keywords) {
+              let safeKeyword = encodeURIComponent(keyword.trim());
+              const searchUrl = `https://www.reddit.com/r/FarmMergeValley/search.json?q=${safeKeyword}&restrict_sr=1&sort=new&t=month`;
+              await getRedditFeed(searchUrl);
+            }
+
+            // Save the current timestamp AFTER successful completion
+            localStorage.setItem(LAST_RUN_KEY, now.toString());
+            console.log("Background Tasks: Update complete. Timestamp saved.");
+          }
+
+          const refreshBtn = document.getElementById("fmv-refresh-btn");
+          if (refreshBtn) {
+            refreshBtn.classList.remove("hidden");
+          }
+        } catch (error) {
+          console.error("Error running backgroundTasks:", error.message);
         }
+      } else {
+        const minutesRemaining = Math.round(
+          (ONE_HOUR_MS - (now - parseInt(lastRun))) / 60000
+        );
+        console.log(
+          `Background Tasks: Skipping. Next update available in ${minutesRemaining} minutes.`
+        );
 
-        console.log("All background tasks completed.");
+        // Still unhide the button so the user can manual refresh if they want
+        const refreshBtn = document.getElementById("fmv-refresh-btn");
+        if (refreshBtn) {
+          refreshBtn.classList.remove("hidden");
+        }
       }
-
-      // Only unhide the button AFTER the loop is finished
-      const refreshBtn = document.getElementById("fvm-refresh-btn");
-      if (refreshBtn) {
-        refreshBtn.classList.remove("hidden");
-      }
-    } catch (error) {
-      console.error("Error running backgroundTasks:", error.message);
     }
   }
 
