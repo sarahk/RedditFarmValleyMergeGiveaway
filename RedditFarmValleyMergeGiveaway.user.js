@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.25
+// @version      2.26
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
-// @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
+// @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
 // @author       itamer
 // @match        https://sh.reddit.com/r/FarmMergeValley/*
 // @match        https://www.reddit.com/r/FarmMergeValley/*
@@ -283,7 +283,7 @@
       });
 
       console.log(
-        `Processed ${minimalPosts.length} giveaway posts for API ingestion.`
+        `Processed ${minimalPosts.length} raffle posts for API ingestion.`
       );
       return minimalPosts;
     } catch (e) {
@@ -662,11 +662,11 @@
         </div>
 
         <div id="fvm-popup-body">
-            <p>Loading giveaways...</p>
+            <p>Loading raffles...</p>
         </div>
 
         <div id="fvm-popup-footer">
-        <button id="fvm-refresh-btn" title="Refreshes the giveaway list." class='hidden'>Refresh</button>
+        <button id="fvm-refresh-btn" title="Refreshes the raffle list." class='hidden'>Refresh</button>
             <button id="fvm-reset-btn" title="Clears the locally stored username. Use this if the script is not tracking correctly.">Clear User ID</button>
         </div>
     `;
@@ -736,6 +736,51 @@
       });
   }
 
+  function getEntryVariables(createdUtc, entryStatus) {
+    let timeTextStyle = "#333"; // Default text color for time
+
+    // TWENTY_FOUR_HOURS_S is defined globally (around line 34)
+    const expirationTime = createdUtc + TWENTY_FOUR_HOURS_S;
+    const currentTime = Math.floor(Date.now() / 1000);
+    const timeRemainingSeconds = expirationTime - currentTime;
+
+    //let timeRemainingText;
+    let linkStyle = "";
+    let linkLabel = "New Raffle";
+    let timeRemainingText = "default";
+
+    if (timeRemainingSeconds > 0) {
+      // Giveaway is active (time remaining)
+      const hours = Math.floor(timeRemainingSeconds / 3600);
+      const minutes = Math.floor((timeRemainingSeconds % 3600) / 60);
+
+      if (hours > 0) {
+        timeRemainingText = `${hours}h ${minutes}m`;
+      } else {
+        // If less than an hour, show minutes only, highlight in red if less than 15m
+        if (minutes < 15) {
+          timeTextStyle = "#a00";
+        }
+        timeRemainingText = `${minutes}m remaining`;
+      }
+
+      // Use linkStyle to indicate "Active" status (if marked by user)
+      if (entry.status === "active") {
+        linkStyle = "color: #f7a01d; font-weight: bold;";
+        linkLabel = "Raffle (you're in)";
+      } else {
+        linkStyle = ""; // Default for unclicked links
+      }
+    } else {
+      // Giveaway is expired
+      timeRemainingText = "EXPIRED";
+      //linkStyle = 'text-decoration: line-through; color: #888;';
+      timeTextStyle = "#a00"; // Highlight expired status
+      linkLabel = "Done, did you win?";
+    }
+    return [timeRemainingText, timeTextStyle, linkLabel, linkStyle];
+  }
+
   function renderPopupContent(groupedData, isUpToDate) {
     const uiElements = injectPopupHtml();
     const popupBody = uiElements.body;
@@ -752,7 +797,7 @@
     priorities.forEach((priority) => {
       const keywords = groupedData[priority];
 
-      html += `<h3 style="margin: 5px 0 10px 0; font-size: 1.1em; color: #5a5a8a;">${priority} Star Giveaways</h3><ul style="border-top: 1px solid #ddd; padding-top: 10px;">`;
+      html += `<h3 style="margin: 5px 0 10px 0; font-size: 1.1em; color: #5a5a8a;">${priority} Star Raffles</h3><ul style="border-top: 1px solid #ddd; padding-top: 10px;">`;
 
       Object.keys(keywords).forEach((keyword) => {
         const entries = keywords[keyword];
@@ -768,42 +813,8 @@
           totalGiveaways++;
 
           // --- TIME CALCULATION LOGIC ---
-          // TWENTY_FOUR_HOURS_S is defined globally (around line 34)
-          const expirationTime = entry.created_utc + TWENTY_FOUR_HOURS_S;
-          const currentTime = Math.floor(Date.now() / 1000);
-          const timeRemainingSeconds = expirationTime - currentTime;
-
-          let timeRemainingText;
-          let linkStyle = "";
-          let timeTextStyle = "#333"; // Default text color for time
-
-          if (timeRemainingSeconds > 0) {
-            // Giveaway is active (time remaining)
-            const hours = Math.floor(timeRemainingSeconds / 3600);
-            const minutes = Math.floor((timeRemainingSeconds % 3600) / 60);
-
-            if (hours > 0) {
-              timeRemainingText = `${hours}h ${minutes}m`;
-            } else {
-              // If less than an hour, show minutes only, highlight in red if less than 15m
-              if (minutes < 15) {
-                timeTextStyle = "#a00";
-              }
-              timeRemainingText = `${minutes}m remaining`;
-            }
-
-            // Use linkStyle to indicate "Active" status (if marked by user)
-            if (entry.status === "active") {
-              linkStyle = "color: #f7a01d; font-weight: bold;";
-            } else {
-              linkStyle = ""; // Default for unclicked links
-            }
-          } else {
-            // Giveaway is expired
-            timeRemainingText = "EXPIRED";
-            //linkStyle = 'text-decoration: line-through; color: #888;';
-            timeTextStyle = "#a00"; // Highlight expired status
-          }
+          const [timeRemainingText, timeTextStyle, linkLabel, linkStyle] =
+            getEntryVariables(entry.created_utc, entry.status);
 
           const linkStatus = entry.status || "null"; // Keep status for the data-attribute
 
@@ -815,7 +826,7 @@
                                    data-status="${linkStatus}"
                                    data-createdutc="${entry.created_utc}"
                                    style="${linkStyle}">
-                                    Link to Giveaway
+                                    ${linkLabel}
                                 </a>
                                 <span style="font-size: 0.9em; margin-left: 10px; color: ${timeTextStyle};">
                                     (${timeRemainingText})
@@ -831,24 +842,24 @@
     // --- FINAL DOM UPDATE AND STATUS MESSAGE LOGIC (RESTORED/CORRECTED) ---
 
     if (totalGiveaways === 0) {
-      let noGiveawaysMessage = "No new or active giveaways found.";
+      let noGiveawaysMessage = "No new or active raffles found.";
 
       // State 2 (No items found AND ingestion failed) - refine the message
       if (!isUpToDate) {
         noGiveawaysMessage =
-          "No current sticker giveaways found. (Feed may be out of date.)";
+          "No current sticker raffles found. (Feed may be out of date.)";
       }
 
       popupBody.innerHTML = `<p style="text-align: center; margin-top: 20px;">${noGiveawaysMessage}</p>`;
-      header.innerHTML = `<span>Sticker Giveaways (0)</span><button class="fvm-popup-close-btn" id="fvm-close-btn">×</button>`;
+      header.innerHTML = `<span>Sticker Raffles (0)</span><button class="fvm-popup-close-btn" id="fvm-close-btn">×</button>`;
     } else {
       popupBody.innerHTML = html;
 
-      let headerTitle = `<span>Sticker Giveaways (${totalGiveaways})</span>`;
+      let headerTitle = `<span>Sticker Raffles (${totalGiveaways})</span>`;
 
       // State 2: Show the "may not be shown" warning message
       if (!isUpToDate) {
-        headerTitle = `<span style="color: #f7a01d; font-weight: bold; font-size: 1.1em; padding-right: 15px;">Latest Giveaways may not be shown</span>`;
+        headerTitle = `<span style="color: #f7a01d; font-weight: bold; font-size: 1.1em; padding-right: 15px;">Latest Raffles may not be shown</span>`;
       }
 
       header.innerHTML = `${headerTitle}<button class="fvm-popup-close-btn" id="fvm-close-btn">×</button>`;
@@ -873,13 +884,13 @@
     if (!skipUserIdCheck && !getStoredUserId()) {
       uiElements.inputArea.style.display = "block";
       uiElements.body.innerHTML =
-        "<p>Please enter your username above to view the giveaway feed.</p>";
+        "<p>Please enter your username above to view the Raffles feed.</p>";
       uiElements.popup.style.display = "block";
       return;
     }
 
     uiElements.inputArea.style.display = "none";
-    uiElements.body.innerHTML = "<p>Loading giveaways...</p>";
+    uiElements.body.innerHTML = "<p>Loading Raffles...</p>";
     uiElements.popup.style.display = "block";
 
     //const groupedData = await fetchAndProcessFeed();
