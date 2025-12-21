@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.27
+// @version      2.28
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -322,55 +322,54 @@
   }
 
   // 3. Update runBackgroundTasks with a proper for...of loop
+
   async function runBackgroundTasks() {
-    async function runBackgroundTasks() {
-      const LAST_RUN_KEY = "fmv_last_background_run";
-      const ONE_HOUR_MS = 60 * 60 * 1000;
-      const now = Date.now();
-      const lastRun = localStorage.getItem(LAST_RUN_KEY);
+    const LAST_RUN_KEY = "fvm_last_background_run";
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const now = Date.now();
+    const lastRun = localStorage.getItem(LAST_RUN_KEY);
 
-      // Only run if there's no timestamp OR if current time is > 1 hour since last run
-      if (!lastRun || now - parseInt(lastRun) > ONE_HOUR_MS) {
-        try {
-          console.log("Background Tasks: Starting scheduled hourly update...");
+    // Only run if there's no timestamp OR if current time is > 1 hour since last run
+    if (!lastRun || now - parseInt(lastRun) > ONE_HOUR_MS) {
+      try {
+        console.log("Background Tasks: Starting scheduled hourly update...");
 
-          const response = await sendFVMApiRequest("keywords", {}, "GET");
-          const keywords = Array.isArray(response)
-            ? response
-            : response.data || [];
+        const response = await sendFVMApiRequest("keywords", {}, "GET");
+        const keywords = Array.isArray(response)
+          ? response
+          : response.data || [];
 
-          if (keywords.length > 0) {
-            for (const keyword of keywords) {
-              let safeKeyword = encodeURIComponent(keyword.trim());
-              const searchUrl = `https://www.reddit.com/r/FarmMergeValley/search.json?q=${safeKeyword}&restrict_sr=1&sort=new&t=month`;
-              await getRedditFeed(searchUrl);
-            }
-
-            // Save the current timestamp AFTER successful completion
-            localStorage.setItem(LAST_RUN_KEY, now.toString());
-            console.log("Background Tasks: Update complete. Timestamp saved.");
+        if (keywords.length > 0) {
+          for (const keyword of keywords) {
+            let safeKeyword = encodeURIComponent(keyword.trim());
+            const searchUrl = `https://www.reddit.com/r/FarmMergeValley/search.json?q=${safeKeyword}&restrict_sr=1&sort=new&t=month`;
+            await getRedditFeed(searchUrl);
           }
 
-          const refreshBtn = document.getElementById("fmv-refresh-btn");
-          if (refreshBtn) {
-            refreshBtn.classList.remove("hidden");
-          }
-        } catch (error) {
-          console.error("Error running backgroundTasks:", error.message);
+          // Save the current timestamp AFTER successful completion
+          localStorage.setItem(LAST_RUN_KEY, now.toString());
+          console.log("Background Tasks: Update complete. Timestamp saved.");
         }
-      } else {
-        const minutesRemaining = Math.round(
-          (ONE_HOUR_MS - (now - parseInt(lastRun))) / 60000
-        );
-        console.log(
-          `Background Tasks: Skipping. Next update available in ${minutesRemaining} minutes.`
-        );
 
-        // Still unhide the button so the user can manual refresh if they want
         const refreshBtn = document.getElementById("fmv-refresh-btn");
         if (refreshBtn) {
           refreshBtn.classList.remove("hidden");
         }
+      } catch (error) {
+        console.error("Error running backgroundTasks:", error.message);
+      }
+    } else {
+      const minutesRemaining = Math.round(
+        (ONE_HOUR_MS - (now - parseInt(lastRun))) / 60000
+      );
+      console.log(
+        `Background Tasks: Skipping. Next update available in ${minutesRemaining} minutes.`
+      );
+
+      // Still unhide the button so the user can manual refresh if they want
+      const refreshBtn = document.getElementById("fmv-refresh-btn");
+      if (refreshBtn) {
+        refreshBtn.classList.remove("hidden");
       }
     }
   }
