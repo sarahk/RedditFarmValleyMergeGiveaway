@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.26
+// @version      2.27
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -765,7 +765,7 @@
       }
 
       // Use linkStyle to indicate "Active" status (if marked by user)
-      if (entry.status === "active") {
+      if (entryStatus === "active") {
         linkStyle = "color: #f7a01d; font-weight: bold;";
         linkLabel = "Raffle (you're in)";
       } else {
