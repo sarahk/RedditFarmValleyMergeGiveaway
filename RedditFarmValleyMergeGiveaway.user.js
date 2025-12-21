@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.19
+// @version      2.20
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -296,35 +296,8 @@
    * Fetches the raw Reddit JSON feed, processes it, and POSTs the minimal data to the API.
    */
   async function ingestRedditFeed() {
-    getRedditFeed(REDDIT_FEED_URL);
+    await getRedditFeed(REDDIT_FEED_URL);
   }
-
-  async function getRedditFeed(reddit_url) {
-    try {
-      console.log("Get Reddit Feed");
-      const responseText = await gmXhrPromise(reddit_url);
-      console.log(["Feed received", responseText]);
-      // --- CRITICAL CHANGE: Process data before sending ---
-      const minimalData = processRawRedditData(responseText);
-
-      console.log("API Ingestion Request Payload:", minimalData);
-      const savedFeed = { payload: minimalData };
-      // The API expects a 'payload' key containing the array of minimal post data
-      await sendFVMApiRequest("post", savedFeed, "POST");
-    } catch (error) {
-      console.error(
-        "CRITICAL FAILURE: Reddit or API POST (Ingestion) failed.",
-        error.message
-      );
-      throw new Error(`Ingestion failed: ${error.message}`);
-    }
-  }
-
-  // 1. Add this to your addStyle block at the top of the CSS
-  addStyle(`
-    .hidden { display: none !important; }
-    /* ... existing styles ... */
-`);
 
   // 2. Update getRedditFeed to await the API save
   async function getRedditFeed(reddit_url) {
@@ -362,9 +335,8 @@
 
         // USE FOR...OF to ensure sequential, awaitable execution
         for (const keyword of keywords) {
-          const searchUrl = `https://www.reddit.com/r/FarmMergeValley/search.json?q=${encodeURIComponent(
-            keyword
-          )}&restrict_sr=1&sort=new&t=month`;
+          let safeKeyword = encodeURIComponent(keyword.trim());
+          const searchUrl = `https://www.reddit.com/r/FarmMergeValley/search.json?q=${safeKeyword}&restrict_sr=1&sort=new&t=month`;
           await getRedditFeed(searchUrl);
         }
 
@@ -380,7 +352,7 @@
       console.error("Error running backgroundTasks:", error.message);
     }
   }
-  async function getRedditKeywordFeed(keyword) {}
+
   // Remaining functions (fetchUserFeed, fetchAndProcessFeed, sendKeywordGot, sendLinkStatus)
   // remain the same as they correctly call sendFVMApiRequest.
 
@@ -545,7 +517,27 @@
 
     document
       .getElementById("fmv-refresh-btn")
-      .addEventListener("click", async () => initApp(true));
+      .addEventListener("click", async (e) => {
+        const btn = e.target;
+
+        // 1. Disable the button and show a loading state so the user doesn't double-click
+        btn.disabled = true;
+        btn.textContent = "Refreshing...";
+        btn.classList.add("loading-spinner"); // If you have a spinner style
+
+        // 2. Run the tasks and WAIT for completion
+        // Note: You must update runBackgroundTasks to be properly 'awaitable'
+        // using a for...of loop as discussed previously.
+        await runBackgroundTasks();
+
+        // 3. Re-render the UI with the fresh data
+        const feedResult = await fetchAndProcessFeed();
+        renderPopupContent(feedResult.data, feedResult.isUpToDate);
+
+        // 4. Restore the button
+        btn.disabled = false;
+        btn.textContent = "Refresh";
+      });
   };
 
   function handleUsernameSubmit() {
