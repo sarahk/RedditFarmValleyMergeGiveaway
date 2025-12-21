@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.20
+// @version      2.21
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -344,7 +344,7 @@
       }
 
       // Only unhide the button AFTER the loop is finished
-      const refreshBtn = document.getElementById("fmv-refresh-btn");
+      const refreshBtn = document.getElementById("fvm-refresh-btn");
       if (refreshBtn) {
         refreshBtn.classList.remove("hidden");
       }
@@ -514,30 +514,6 @@
         }
       });
     });
-
-    document
-      .getElementById("fmv-refresh-btn")
-      .addEventListener("click", async (e) => {
-        const btn = e.target;
-
-        // 1. Disable the button and show a loading state so the user doesn't double-click
-        btn.disabled = true;
-        btn.textContent = "Refreshing...";
-        btn.classList.add("loading-spinner"); // If you have a spinner style
-
-        // 2. Run the tasks and WAIT for completion
-        // Note: You must update runBackgroundTasks to be properly 'awaitable'
-        // using a for...of loop as discussed previously.
-        await runBackgroundTasks();
-
-        // 3. Re-render the UI with the fresh data
-        const feedResult = await fetchAndProcessFeed();
-        renderPopupContent(feedResult.data, feedResult.isUpToDate);
-
-        // 4. Restore the button
-        btn.disabled = false;
-        btn.textContent = "Refresh";
-      });
   };
 
   function handleUsernameSubmit() {
@@ -668,7 +644,7 @@
         </div>
 
         <div id="fmv-popup-footer">
-        <button id="fmv-refresh-btn" title="Refreshes the giveaway list." class='hidden'>Refresh</button>
+        <button id="fvm-refresh-btn" title="Refreshes the giveaway list." class='hidden'>Refresh</button>
             <button id="fmv-reset-btn" title="Clears the locally stored username. Use this if the script is not tracking correctly.">Clear User ID</button>
         </div>
     `;
@@ -712,6 +688,30 @@
         location.reload();
       }
     });
+
+    document
+      .getElementById("fvm-refresh-btn")
+      .addEventListener("click", async (e) => {
+        const btn = e.target;
+
+        // 1. Disable the button and show a loading state so the user doesn't double-click
+        btn.disabled = true;
+        btn.textContent = "Refreshing...";
+        btn.classList.add("loading-spinner"); // If you have a spinner style
+
+        // 2. Run the tasks and WAIT for completion
+        // Note: You must update runBackgroundTasks to be properly 'awaitable'
+        // using a for...of loop as discussed previously.
+        await runBackgroundTasks();
+
+        // 3. Re-render the UI with the fresh data
+        const feedResult = await fetchAndProcessFeed();
+        renderPopupContent(feedResult.data, feedResult.isUpToDate);
+
+        // 4. Restore the button
+        btn.disabled = false;
+        btn.textContent = "Refresh";
+      });
   }
 
   function renderPopupContent(groupedData, isUpToDate) {
