@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.22
+// @version      2.23
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -645,7 +645,7 @@
 
         <div id="fvm-popup-footer">
         <button id="fvm-refresh-btn" title="Refreshes the giveaway list." class='hidden'>Refresh</button>
-            <button Òid="fvm-reset-btn" title="Clears the locally stored username. Use this if the script is not tracking correctly.">Clear User ID</button>
+            <button id="fvm-reset-btn" title="Clears the locally stored username. Use this if the script is not tracking correctly.">Clear User ID</button>
         </div>
     `;
     document.body.appendChild(popup);
