@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.21
+// @version      2.22
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -38,7 +38,7 @@
   const API_SECRET_KEY = "pum@90Nervous";
 
   // Storage Key for User ID
-  const USER_ID_STORAGE_KEY = "fmv_user_id";
+  const USER_ID_STORAGE_KEY = "fvm_user_id";
 
   const TWENTY_FOUR_HOURS_S = 24 * 60 * 60;
 
@@ -517,7 +517,7 @@
   };
 
   function handleUsernameSubmit() {
-    const inputField = document.getElementById("fmv-username-input");
+    const inputField = document.getElementById("fvm-username-input");
     const username = inputField.value.trim();
 
     if (username.length > 2) {
@@ -530,16 +530,16 @@
   }
 
   function injectPopupHtml() {
-    let popup = document.getElementById("fmv-giveaways-popup");
+    let popup = document.getElementById("fvm-giveaways-popup");
 
     if (popup) {
-      const inputArea = document.getElementById("fmv-user-input-area");
+      const inputArea = document.getElementById("fvm-user-input-area");
       if (inputArea) {
         return {
           popup: popup,
           inputArea: inputArea,
-          body: document.getElementById("fmv-popup-body"),
-          header: document.getElementById("fmv-popup-header"), // <-- ADD THIS LINE
+          body: document.getElementById("fvm-popup-body"),
+          header: document.getElementById("fvm-popup-header"), // <-- ADD THIS LINE
         };
       } else {
         popup.remove();
@@ -549,7 +549,7 @@
 
     // --- Inject Styles ---
     addStyle(`
-        #fmv-giveaways-popup {
+        #fvm-giveaways-popup {
             z-index: 10000;
             position: fixed;
             bottom: 20px;
@@ -563,7 +563,7 @@
             font-size: 14px;
             display: none;
         }
-        #fmv-popup-header {
+        #fvm-popup-header {
             background-color: #E2852E;
             color: white;
             padding: 8px 10px;
@@ -573,23 +573,23 @@
             border-top-left-radius: 8px;
             border-top-right-radius: 8px;
         }
-        #fmv-popup-body {
+        #fvm-popup-body {
             padding: 15px 10px;
             max-height: 400px;
             overflow-y: auto;
         }
-        #fmv-user-input-area {
+        #fvm-user-input-area {
             padding: 15px 10px;
             border-bottom: 1px solid #ddd;
         }
-        #fmv-user-input-area input[type="text"] {
+        #fvm-user-input-area input[type="text"] {
             width: 60%;
             padding: 5px;
             margin-right: 5px;
             border: 1px solid #ccc;
             border-radius: 4px;
         }
-        #fmv-user-input-area button {
+        #fvm-user-input-area button {
             padding: 6px 10px;
             border: none;
             border-radius: 4px;
@@ -597,12 +597,12 @@
             color: white;
             cursor: pointer;
         }
-        #fmv-popup-footer {
+        #fvm-popup-footer {
             border-top: 1px solid #eee;
             padding: 8px 10px;
             text-align: right;
         }
-        .fmv-popup-close-btn {
+        .fvm-popup-close-btn {
             background: none;
             border: none;
             color: white;
@@ -624,28 +624,28 @@
 
     // --- Create and Inject HTML ---
     popup = document.createElement("div");
-    popup.id = "fmv-giveaways-popup";
+    popup.id = "fvm-giveaways-popup";
     popup.innerHTML = `
-        <div id="fmv-popup-header">
+        <div id="fvm-popup-header">
             <span>Sticker Giveaways</span>
-            <button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>
+            <button class="fvm-popup-close-btn" id="fvm-close-btn">×</button>
         </div>
 
-        <div id="fmv-user-input-area">
+        <div id="fvm-user-input-area">
             <p style="margin-top: 0; font-size: 0.9em; color: #555;">
                 Enter a unique username (e.g., Reddit ID) to start tracking:
             </p>
-            <input type="text" id="fmv-username-input" placeholder="Your Username" value=""/>
-            <button id="fmv-submit-user-btn">Start</button>
+            <input type="text" id="fvm-username-input" placeholder="Your Username" value=""/>
+            <button id="fvm-submit-user-btn">Start</button>
         </div>
 
-        <div id="fmv-popup-body">
+        <div id="fvm-popup-body">
             <p>Loading giveaways...</p>
         </div>
 
-        <div id="fmv-popup-footer">
+        <div id="fvm-popup-footer">
         <button id="fvm-refresh-btn" title="Refreshes the giveaway list." class='hidden'>Refresh</button>
-            <button id="fmv-reset-btn" title="Clears the locally stored username. Use this if the script is not tracking correctly.">Clear User ID</button>
+            <button Òid="fvm-reset-btn" title="Clears the locally stored username. Use this if the script is not tracking correctly.">Clear User ID</button>
         </div>
     `;
     document.body.appendChild(popup);
@@ -654,33 +654,33 @@
 
     return {
       popup: popup,
-      inputArea: document.getElementById("fmv-user-input-area"),
-      body: document.getElementById("fmv-popup-body"),
-      header: document.getElementById("fmv-popup-header"), // <-- ADD THIS LINE
+      inputArea: document.getElementById("fvm-user-input-area"),
+      body: document.getElementById("fvm-popup-body"),
+      header: document.getElementById("fvm-popup-header"), // <-- ADD THIS LINE
     };
   }
 
   function attachUIListeners() {
     // --- Attach UI Listeners ---
     console.log("function attachUIListeners");
-    //console.log(document.getElementById('fmv-close-btn'));
-    document.getElementById("fmv-close-btn").addEventListener("click", () => {
+    //console.log(document.getElementById('fvm-close-btn'));
+    document.getElementById("fvm-close-btn").addEventListener("click", () => {
       console.log("closing popup");
-      document.getElementById("fmv-giveaways-popup").style.display = "none";
+      document.getElementById("fvm-giveaways-popup").style.display = "none";
     });
 
     document
-      .getElementById("fmv-submit-user-btn")
+      .getElementById("fvm-submit-user-btn")
       .addEventListener("click", handleUsernameSubmit);
     document
-      .getElementById("fmv-username-input")
+      .getElementById("fvm-username-input")
       .addEventListener("keypress", (e) => {
         if (e.key === "Enter") {
           handleUsernameSubmit();
         }
       });
 
-    document.getElementById("fmv-reset-btn").addEventListener("click", () => {
+    document.getElementById("fvm-reset-btn").addEventListener("click", () => {
       if (
         confirm("Are you sure you want to clear your locally stored User ID?")
       ) {
@@ -788,7 +788,7 @@
           // --- UPDATED HTML GENERATION ---
           html += `<li style="margin-bottom: 3px; display: flex; align-items: baseline;">
                                 <a href="${entry.url}" target="_blank"
-                                   class="fmv-giveaway-link giveaway-link"
+                                   class="fvm-giveaway-link giveaway-link"
                                    data-id="${entry.id}"
                                    data-status="${linkStatus}"
                                    data-createdutc="${entry.created_utc}"
@@ -818,7 +818,7 @@
       }
 
       popupBody.innerHTML = `<p style="text-align: center; margin-top: 20px;">${noGiveawaysMessage}</p>`;
-      header.innerHTML = `<span>Sticker Giveaways (0)</span><button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>`;
+      header.innerHTML = `<span>Sticker Giveaways (0)</span><button class="fvm-popup-close-btn" id="fvm-close-btn">×</button>`;
     } else {
       popupBody.innerHTML = html;
 
@@ -829,7 +829,7 @@
         headerTitle = `<span style="color: #f7a01d; font-weight: bold; font-size: 1.1em; padding-right: 15px;">Latest Giveaways may not be shown</span>`;
       }
 
-      header.innerHTML = `${headerTitle}<button class="fmv-popup-close-btn" id="fmv-close-btn">×</button>`;
+      header.innerHTML = `${headerTitle}<button class="fvm-popup-close-btn" id="fvm-close-btn">×</button>`;
       attachEventListeners();
       attachUIListeners();
     }
