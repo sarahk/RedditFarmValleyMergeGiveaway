@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.28
+// @version      2.29
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -640,6 +640,21 @@
             cursor: pointer;
             font-size: 0.8em;
         }
+            .gotit-pill {
+              display: inline-block;
+              background-color: #F5C857;
+              color: #333;
+              padding: 2px 8px;
+              margin: 2px;
+              border-radius: 12px;
+              font-size: 0.75em;
+              cursor: pointer;
+              border: 1px solid #d4a017;
+          }
+          .gotit-pill:hover {
+              background-color: #e2b43d;
+              text-decoration: line-through;
+          }
         .hidden { display: none !important; }
         `);
 
@@ -780,6 +795,58 @@
     return [timeRemainingText, timeTextStyle, linkLabel, linkStyle];
   }
 
+  const fetchGotIts = async () => {
+    try {
+      return await sendFVMApiRequest(
+        "gotits",
+        { user: CURRENT_USER_ID },
+        "GET"
+      );
+    } catch (e) {
+      console.error("Failed to fetch GotIts:", e);
+      return null;
+    }
+  };
+
+  const deleteKeywordGot = async (keyword) => {
+    try {
+      await sendFVMApiRequest(
+        "delete_keyword",
+        {
+          user: CURRENT_USER_ID,
+          keyword: keyword,
+        },
+        "POST"
+      );
+      initApp(true); // Reload the UI
+    } catch (e) {
+      alert("Failed to delete keyword.");
+    }
+  };
+
+  const renderGotItPills = async () => {
+    const gotItsData = await fetchGotIts();
+    if (!gotItsData) return;
+
+    Object.keys(gotItsData).forEach((priority) => {
+      const container = document.getElementById(`fvm-gotits${priority}`);
+      if (container && gotItsData[priority].length > 0) {
+        container.innerHTML = `<div style="margin-top: 5px; font-size: 0.8em; color: #777;">Collected:</div>`;
+        gotItsData[priority].forEach((keyword) => {
+          const pill = document.createElement("span");
+          pill.className = "gotit-pill";
+          pill.textContent = keyword;
+          pill.onclick = () => {
+            if (confirm(`Remove "${keyword}" from collected list?`)) {
+              deleteKeywordGot(keyword);
+            }
+          };
+          container.appendChild(pill);
+        });
+      }
+    });
+  };
+
   function renderPopupContent(groupedData, isUpToDate) {
     const uiElements = injectPopupHtml();
     const popupBody = uiElements.body;
@@ -835,7 +902,8 @@
         });
         html += "</ul>";
       });
-      html += "</ul>";
+      html +=
+        "</ul><div id='fvm-gotits${priority}' style='margin-bottom: 15px; padding-left: 10px;'></div>";
     });
 
     // --- FINAL DOM UPDATE AND STATUS MESSAGE LOGIC (RESTORED/CORRECTED) ---
