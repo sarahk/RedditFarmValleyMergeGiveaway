@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.31
+// @version      2.32
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -18,6 +18,7 @@
 // @grant        unsafeWindow
 // @run-at       document-idle
 // @sandbox      js
+// @noframes
 // ==/UserScript==
 
 (function () {
@@ -832,7 +833,7 @@
       const container = document.getElementById(`fvm-gotits${priority}`);
       console.log(["renderGotItPills-container", priority, container]);
       if (container && gotItsData[priority].length > 0) {
-        container.innerHTML = `<div style="margin-top: 5px; font-size: 0.8em; color: #777;">Collected (experimental):</div>`;
+        container.innerHTML = `<div style="margin-top: 5px; font-size: 0.8em; color: #777;">Collected (click to reactivate):</div>`;
         gotItsData[priority].forEach((keyword) => {
           console.log(["renderGotItPills", priority, keyword]);
           const pill = document.createElement("span");
