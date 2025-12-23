@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.30
+// @version      2.31
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -15,7 +15,6 @@
 // @connect      sh.reddit.com
 // @connect      fvm.itamer.com
 // @grant        GM.xmlHttpRequest
-// @grant        GM_addStyle
 // @grant        unsafeWindow
 // @run-at       document-idle
 // @sandbox      js
@@ -45,18 +44,105 @@
   // Global variable to hold the user ID once validated
   let CURRENT_USER_ID = null;
 
-  // --- Utility Functions (addStyle, gmXhrPromise, etc. remain the same) ---
+  // --- Utility Functions (addFVMStyle, gmXhrPromise, etc. remain the same) ---
 
-  function addStyle(css) {
-    if (typeof GM_addStyle !== "undefined") {
-      GM_addStyle(css);
-      return;
-    }
-    const style = document.createElement("style");
-    style.type = "text/css";
-    style.textContent = css;
+  function addFVMStyle() {
+    const css = `
+        #fvm-giveaways-popup {
+            z-index: 10000;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            background: #f9f9f9;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            display: none;
+        }
+        #fvm-popup-header {
+            background-color: #E2852E;
+            color: white;
+            padding: 8px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+        #fvm-popup-body {
+            padding: 15px 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        #fvm-user-input-area {
+            padding: 15px 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        #fvm-user-input-area input[type="text"] {
+            width: 60%;
+            padding: 5px;
+            margin-right: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #fvm-user-input-area button {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #5cb85c;
+            color: white;
+            cursor: pointer;
+        }
+        #fvm-popup-footer {
+            border-top: 1px solid #eee;
+            padding: 8px 10px;
+            text-align: right;
+        }
+        .fvm-popup-close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2em;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .got-it-btn {
+            background-color: #5a5a8a;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+            .gotit-pill {
+              display: inline-block;
+              background-color: #F5C857;
+              color: #333;
+              padding: 2px 8px;
+              margin: 2px;
+              border-radius: 12px;
+              font-size: 0.75em;
+              cursor: pointer;
+              border: 1px solid #d4a017;
+          }
+          .gotit-pill:hover {
+              background-color: #e2b43d;
+              text-decoration: line-through;
+          }
+        .hidden { display: none !important; }
+        `;
+    const styleId = "fvm-custom-style";
+    if (document.getElementById(styleId)) return;
+    const styleElement = document.createElement("style");
+    styleElement.id = styleId;
+
+    styleElement.textContent = css;
     (document.head || document.body || document.documentElement).appendChild(
-      style
+      styleElement
     );
   }
 
@@ -569,94 +655,7 @@
     }
 
     // --- Inject Styles ---
-    addStyle(`
-        #fvm-giveaways-popup {
-            z-index: 10000;
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 300px;
-            background: #f9f9f9;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            display: none;
-        }
-        #fvm-popup-header {
-            background-color: #E2852E;
-            color: white;
-            padding: 8px 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-        }
-        #fvm-popup-body {
-            padding: 15px 10px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        #fvm-user-input-area {
-            padding: 15px 10px;
-            border-bottom: 1px solid #ddd;
-        }
-        #fvm-user-input-area input[type="text"] {
-            width: 60%;
-            padding: 5px;
-            margin-right: 5px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        #fvm-user-input-area button {
-            padding: 6px 10px;
-            border: none;
-            border-radius: 4px;
-            background-color: #5cb85c;
-            color: white;
-            cursor: pointer;
-        }
-        #fvm-popup-footer {
-            border-top: 1px solid #eee;
-            padding: 8px 10px;
-            text-align: right;
-        }
-        .fvm-popup-close-btn {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 1.2em;
-            cursor: pointer;
-            line-height: 1;
-        }
-        .got-it-btn {
-            background-color: #5a5a8a;
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8em;
-        }
-            .gotit-pill {
-              display: inline-block;
-              background-color: #F5C857;
-              color: #333;
-              padding: 2px 8px;
-              margin: 2px;
-              border-radius: 12px;
-              font-size: 0.75em;
-              cursor: pointer;
-              border: 1px solid #d4a017;
-          }
-          .gotit-pill:hover {
-              background-color: #e2b43d;
-              text-decoration: line-through;
-          }
-        .hidden { display: none !important; }
-        `);
+    addFVMStyle();
 
     // --- Create and Inject HTML ---
     popup = document.createElement("div");
@@ -825,14 +824,17 @@
   };
 
   const renderGotItPills = async () => {
+    console.log("function: renderGotItPills");
     const gotItsData = await fetchGotIts();
     if (!gotItsData) return;
-
+    console.log(["renderGotItPills", gotItsData]);
     Object.keys(gotItsData).forEach((priority) => {
       const container = document.getElementById(`fvm-gotits${priority}`);
+      console.log(["renderGotItPills-container", priority, container]);
       if (container && gotItsData[priority].length > 0) {
-        container.innerHTML = `<div style="margin-top: 5px; font-size: 0.8em; color: #777;">Collected:</div>`;
+        container.innerHTML = `<div style="margin-top: 5px; font-size: 0.8em; color: #777;">Collected (experimental):</div>`;
         gotItsData[priority].forEach((keyword) => {
+          console.log(["renderGotItPills", priority, keyword]);
           const pill = document.createElement("span");
           pill.className = "gotit-pill";
           pill.textContent = keyword;
@@ -848,10 +850,14 @@
   };
 
   function renderPopupContent(groupedData, isUpToDate) {
-    const uiElements = injectPopupHtml();
-    const popupBody = uiElements.body;
-    const header = uiElements.header; // <-- Added header reference for later use
-    const popup = uiElements.popup;
+    //const uiElements = injectPopupHtml();
+    // const popupBody = uiElements.body;
+    // const header = uiElements.header; // <-- Added header reference for later use
+    // const popup = uiElements.popup;
+
+    const popupBody = document.getElementById("fvm-popup-body");
+    const header = document.getElementById("fvm-popup-header");
+    const popup = document.getElementById("fvm-giveaways-popup");
 
     popupBody.innerHTML = "";
     console.log(["renderPopupContent", groupedData, isUpToDate]);
@@ -902,8 +908,7 @@
         });
         html += "</ul>";
       });
-      html +=
-        "</ul><div id='fvm-gotits${priority}' style='margin-bottom: 15px; padding-left: 10px;'></div>";
+      html += `</ul><div id='fvm-gotits${priority}' style='margin-bottom: 15px; padding-left: 10px;'></div>`;
     });
 
     // --- FINAL DOM UPDATE AND STATUS MESSAGE LOGIC (RESTORED/CORRECTED) ---
@@ -935,6 +940,7 @@
     }
 
     popup.style.display = "block";
+    renderGotItPills();
   }
 
   /**
@@ -975,7 +981,7 @@
       // State 1 & 2: API Feed is available. Always render the data.
       // The renderPopupContent handles the "may not be shown" warning based on isUpToDate.
       renderPopupContent(feedResult.data, feedResult.isUpToDate);
-      renderGotItPills();
+      //renderGotItPills();
       runBackgroundTasks();
     } else {
       // State 3: The API GET request failed (feedResult is null). Show the critical error.
