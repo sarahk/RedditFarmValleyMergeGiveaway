@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.33
+// @version      2.34
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -362,6 +362,7 @@
             id: post.name, // Reddit prefix t3_...
             url: post.url,
             title: post.title,
+            author: post.author,
             keyword: parsed.keyword,
             stars: parsed.stars,
             created_utc: post.created_utc,
@@ -874,10 +875,11 @@
 
       Object.keys(keywords).forEach((keyword) => {
         const entries = keywords[keyword];
+        const counter = entries.length;
         if (entries.length === 0) return;
 
         html += `<li style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start;">
-                        <strong style="flex-grow: 1;">${keyword}</strong>
+                        <strong style="flex-grow: 1;">${keyword}</strong> (${counter})
                         <button class="got-it-btn" data-keyword="${keyword}">Got It!</button>
                     </li>
                     <ul style="list-style: disc; margin-left: 10px;">`;
