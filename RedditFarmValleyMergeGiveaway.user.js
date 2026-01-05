@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.34
+// @version      2.35
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -135,6 +135,18 @@
               text-decoration: line-through;
           }
         .hidden { display: none !important; }
+        .fvm_modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border: 2px solid rgb(51, 51, 51);
+            border-radius: .5em;
+            z-index: 1000;
+            box-shadow: rgba(0, 0, 0, 0.3) 0px 4px 15px;
+          }
         `;
     const styleId = "fvm-custom-style";
     if (document.getElementById(styleId)) return;
@@ -623,7 +635,64 @@
         }
       });
     });
+
+    document
+      .querySelector(".fvm_expired")
+      .addEventListener("click", function (e) {
+        // 1. Get Data from the sibling link
+        const link = this.closest("li").querySelector(".fvm-giveaway-link");
+        const author = link.dataset.author;
+        const createdUtc = parseInt(link.dataset.createdutc);
+
+        // 2. Calculate "Time Since" minus 24 hours
+        const nowInSeconds = Math.floor(Date.now() / 1000);
+        const secondsInDay = 86400;
+
+        // Total elapsed time minus 24 hours (86400 seconds)
+        let diff = nowInSeconds - createdUtc - secondsInDay;
+
+        // If it's been less than 24 hours, diff will be negative
+        if (diff < 0) diff = 0;
+
+        const days = Math.floor(diff / 86400);
+        const hours = Math.floor((diff % 86400) / 3600);
+        const minutes = Math.floor((diff % 3600) / 60);
+
+        // 3. Create a custom Alert/Modal
+        const message = `
+        Author: ${author}
+        Created: ${new Date(createdUtc * 1000).toLocaleString()}
+        Time since Raffle Closed: ${days}d ${hours}h ${minutes}m
+    `;
+
+        showCustomAlert(message, author);
+      });
   };
+
+  function showCustomAlert(text, author) {
+    // Create a simple overlay
+    const modal = document.createElement("div");
+    modal.className = "fvm_modal";
+    //modal.style =
+    //("position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border:2px solid #333; z-index:1000; box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-family: sans-serif;");
+
+    modal.innerHTML = `
+        <pre style="white-space: pre-wrap; border-radius: .5em;">${text}</pre>
+        <div style="margin-top:15px; display:flex; gap:10px;">
+            <button id="closeModal" style="padding: 0 10px">Close</button>
+            <button id="goAuthor" style="background:#E2852E; color:white; border:none; padding:0 10px; cursor:pointer;">Go to Author</button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Button Logic
+    document.getElementById("closeModal").onclick = () => modal.remove();
+    document.getElementById("goAuthor").onclick = () => {
+      window.open(`https://www.reddit.com/u/${author}`, "_blank");
+      modal.remove();
+    };
+  }
 
   function handleUsernameSubmit() {
     const inputField = document.getElementById("fvm-username-input");
@@ -786,9 +855,10 @@
       } else {
         linkStyle = ""; // Default for unclicked links
       }
+      timeRemainingText = `(${timeRemainingText})`;
     } else {
       // Giveaway is expired
-      timeRemainingText = "EXPIRED";
+      timeRemainingText = "<span class='fvm_expired'>ℹ️</span>";
       //linkStyle = 'text-decoration: line-through; color: #888;';
       timeTextStyle = "#a00"; // Highlight expired status
       linkLabel = "Done, did you win?";
@@ -898,13 +968,14 @@
                                 <a href="${entry.url}" 
                                    class="fvm-giveaway-link giveaway-link"
                                    data-id="${entry.id}"
+                                   data-author="${entry.author}"
                                    data-status="${linkStatus}"
                                    data-createdutc="${entry.created_utc}"
                                    style="${linkStyle}">
                                     ${linkLabel}
                                 </a>
                                 <span style="font-size: 0.9em; margin-left: 10px; color: ${timeTextStyle};">
-                                    (${timeRemainingText})
+                                    ${timeRemainingText}
                                 </span>
                             </li>`;
           // --- END UPDATED HTML GENERATION ---
