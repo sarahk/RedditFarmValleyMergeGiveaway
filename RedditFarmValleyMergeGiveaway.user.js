@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.38
+// @version      2.39
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -642,6 +642,13 @@
     const expiredSpans = document.querySelectorAll(".fvm_expired");
     expiredSpans.forEach((span) => {
       span.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 1. Remove existing modal if one is already open
+        const existingModal = document.querySelector(".fvm_modal");
+        if (existingModal) existingModal.remove();
+
         // 1. Get Data from the sibling link
         const link = this.closest("li").querySelector(".fvm-giveaway-link");
         const author = link.dataset.author;
@@ -691,8 +698,14 @@
     document.body.appendChild(modal);
 
     // Button Logic
-    document.getElementById("fvmCloseModal").onclick = () => modal.remove();
-    document.getElementById("fvmGoAuthor").onclick = () => {
+    // 2. Attach listeners IMMEDIATELY after appending
+    document.getElementById("fvmCloseModal").onclick = (e) => {
+      e.preventDefault();
+      modal.remove();
+    };
+
+    document.getElementById("fvmGoAuthor").onclick = (e) => {
+      e.preventDefault();
       window.open(`https://www.reddit.com/u/${author}`, "_blank");
       modal.remove();
     };
@@ -1011,7 +1024,7 @@
       }
 
       header.innerHTML = `${headerTitle}<button class="fvm-popup-close-btn" id="fvm-close-btn">×</button>`;
-      attachEventListeners();
+      //attachEventListeners();
       attachUIListeners();
     }
 
