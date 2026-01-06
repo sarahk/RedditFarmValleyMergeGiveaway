@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.35
+// @version      2.36
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -147,6 +147,9 @@
             z-index: 1000;
             box-shadow: rgba(0, 0, 0, 0.3) 0px 4px 15px;
           }
+            .fvm_expired{
+              margin-left: 10px;
+            }
         `;
     const styleId = "fvm-custom-style";
     if (document.getElementById(styleId)) return;
@@ -855,7 +858,7 @@
       } else {
         linkStyle = ""; // Default for unclicked links
       }
-      timeRemainingText = `(${timeRemainingText})`;
+      timeRemainingText = `<span style="font-size: 0.9em; margin-left: 10px; color: ${timeTextStyle};">(${timeRemainingText})</span>`;
     } else {
       // Giveaway is expired
       timeRemainingText = "<span class='fvm_expired'>ℹ️</span>";
@@ -974,9 +977,9 @@
                                    style="${linkStyle}">
                                     ${linkLabel}
                                 </a>
-                                <span style="font-size: 0.9em; margin-left: 10px; color: ${timeTextStyle};">
+                                
                                     ${timeRemainingText}
-                                </span>
+                                
                             </li>`;
           // --- END UPDATED HTML GENERATION ---
         });
