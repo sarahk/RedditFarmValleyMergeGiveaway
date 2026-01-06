@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.39
+// @version      2.40
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -23,7 +23,6 @@
 
 (function () {
   ("use strict");
-  console.log(window.IITC);
 
   // --- Configuration ---
   const REDDIT_FEED_URL =
@@ -164,7 +163,7 @@
 
   function gmXhrPromise(url) {
     return new Promise((resolve, reject) => {
-      console.log(`[XHR] Initializing request to: ${url}`);
+      //console.log(`[XHR] Initializing request to: ${url}`);
 
       // We use the underscore version for better compatibility with older headers
       const xhr =
@@ -184,11 +183,11 @@
         timeout: 10000,
 
         // This will tell us if the request actually leaves the browser
-        onprogress: (res) =>
-          console.log(`[XHR] Progress: ${res.loaded} bytes received`),
+        //onprogress: (res) =>
+        //console.log(`[XHR] Progress: ${res.loaded} bytes received`),
 
         onload: function (response) {
-          console.log(`[XHR] Status Code: ${response.status}`);
+          //console.log(`[XHR] Status Code: ${response.status}`);
           if (response.status === 200) {
             resolve(response.responseText);
           } else if (response.status === 301 || response.status === 302) {
@@ -229,7 +228,7 @@
       // GET Request (e.g., what=feed)
       const params = new URLSearchParams(data);
       url += `?what=${what}&${params.toString()}`;
-      console.log(["get", url]);
+      //console.log(["get", url]);
     } else {
       // POST Request (sends data as standard form data)
       headers["Content-Type"] = "application/x-www-form-urlencoded";
@@ -249,7 +248,7 @@
       }
       payload = params.toString();
     }
-    console.log(url);
+    //console.log(url);
     return new Promise((resolve, reject) => {
       GM.xmlHttpRequest({
         method: method,
@@ -259,9 +258,9 @@
 
         // --- CRITICAL: THE RESTORED ONLOAD LOGIC ---
         onload: function (response) {
-          console.log(
-            `API_CALL: Received response for '${what}'. Status: ${response.status}`
-          );
+          // console.log(
+          //   `API_CALL: Received response for '${what}'. Status: ${response.status}`
+          // );
 
           try {
             // Even on success, the response must be parsed (e.g., status: success)
@@ -279,7 +278,7 @@
             }
 
             if (response.status >= 200 && response.status < 300) {
-              console.log(`API_CALL: Resolved successfully for '${what}'.`);
+              //console.log(`API_CALL: Resolved successfully for '${what}'.`);
               resolve(jsonResponse); // Resolves the Promise!
             } else {
               console.error(
@@ -405,7 +404,7 @@
   // 2. Update getRedditFeed to await the API save
   async function getRedditFeed(reddit_url) {
     try {
-      console.log("Fetching Reddit Feed:", reddit_url);
+      //console.log("Fetching Reddit Feed:", reddit_url);
       const responseText = await gmXhrPromise(reddit_url);
       const minimalData = processRawRedditData(responseText);
 
@@ -487,7 +486,7 @@
         { user: CURRENT_USER_ID },
         "GET"
       );
-      console.log(["fetchUserFeed", response, response.data]);
+      //console.log(["fetchUserFeed", response, response.data]);
       //return response.data;
       return response;
     } catch (error) {
@@ -641,9 +640,10 @@
 
     const expiredSpans = document.querySelectorAll(".fvm_expired");
     expiredSpans.forEach((span) => {
+      console.log(["expiredSpans span:", span]);
       span.addEventListener("click", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
+        //e.preventDefault();
+        //e.stopPropagation();
 
         // 1. Remove existing modal if one is already open
         const existingModal = document.querySelector(".fvm_modal");
@@ -910,17 +910,17 @@
   };
 
   const renderGotItPills = async () => {
-    console.log("function: renderGotItPills");
+    //console.log("function: renderGotItPills");
     const gotItsData = await fetchGotIts();
     if (!gotItsData) return;
-    console.log(["renderGotItPills", gotItsData]);
+    //console.log(["renderGotItPills", gotItsData]);
     Object.keys(gotItsData).forEach((priority) => {
       const container = document.getElementById(`fvm-gotits${priority}`);
-      console.log(["renderGotItPills-container", priority, container]);
+      //console.log(["renderGotItPills-container", priority, container]);
       if (container && gotItsData[priority].length > 0) {
         container.innerHTML = `<div style="margin-top: 5px; font-size: 0.8em; color: #777;">Collected (click to reactivate):</div>`;
         gotItsData[priority].forEach((keyword) => {
-          console.log(["renderGotItPills", priority, keyword]);
+          //console.log(["renderGotItPills", priority, keyword]);
           const pill = document.createElement("span");
           pill.className = "gotit-pill";
           pill.textContent = keyword;
@@ -1024,7 +1024,7 @@
       }
 
       header.innerHTML = `${headerTitle}<button class="fvm-popup-close-btn" id="fvm-close-btn">×</button>`;
-      //attachEventListeners();
+      attachEventListeners();
       attachUIListeners();
     }
 
