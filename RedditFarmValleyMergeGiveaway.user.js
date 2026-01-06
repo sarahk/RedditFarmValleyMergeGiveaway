@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.36
+// @version      2.37
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -682,16 +682,16 @@
     modal.innerHTML = `
         <pre style="white-space: pre-wrap; border-radius: .5em;">${text}</pre>
         <div style="margin-top:15px; display:flex; gap:10px;">
-            <button id="closeModal" style="padding: 0 10px">Close</button>
-            <button id="goAuthor" style="background:#E2852E; color:white; border:none; padding:0 10px; cursor:pointer;">Go to Author</button>
+            <button id="fvmCloseModal" style="padding: 0 10px">Close</button>
+            <button id="fvmGoAuthor" style="background:#E2852E; color:white; border:none; padding:0 10px; cursor:pointer;">Go to Author</button>
         </div>
     `;
 
     document.body.appendChild(modal);
 
     // Button Logic
-    document.getElementById("closeModal").onclick = () => modal.remove();
-    document.getElementById("goAuthor").onclick = () => {
+    document.getElementById("fvmCloseModal").onclick = () => modal.remove();
+    document.getElementById("fvmGoAuthor").onclick = () => {
       window.open(`https://www.reddit.com/u/${author}`, "_blank");
       modal.remove();
     };
@@ -835,6 +835,7 @@
     let linkStyle = "";
     let linkLabel = "New Raffle";
     let timeRemainingText = "default";
+    let timeRemainingHtml = "";
 
     if (timeRemainingSeconds > 0) {
       // Giveaway is active (time remaining)
@@ -855,18 +856,14 @@
       if (entryStatus === "active") {
         linkStyle = "color: #f7a01d; font-weight: bold;";
         linkLabel = "Raffle (you're in)";
-      } else {
-        linkStyle = ""; // Default for unclicked links
       }
-      timeRemainingText = `<span style="font-size: 0.9em; margin-left: 10px; color: ${timeTextStyle};">(${timeRemainingText})</span>`;
+      timeRemainingHtml = `<span style="font-size: 0.9em; margin-left: 10px; color: ${timeTextStyle};">(${timeRemainingText})</span>`;
     } else {
       // Giveaway is expired
-      timeRemainingText = "<span class='fvm_expired'>ℹ️</span>";
-      //linkStyle = 'text-decoration: line-through; color: #888;';
-      timeTextStyle = "#a00"; // Highlight expired status
+      timeRemainingHtml = "<span class='fvm_expired'>ℹ️</span>";
       linkLabel = "Done, did you win?";
     }
-    return [timeRemainingText, timeTextStyle, linkLabel, linkStyle];
+    return [timeRemainingHtml, linkLabel, linkStyle];
   }
 
   const fetchGotIts = async () => {
@@ -961,8 +958,10 @@
           totalGiveaways++;
 
           // --- TIME CALCULATION LOGIC ---
-          const [timeRemainingText, timeTextStyle, linkLabel, linkStyle] =
-            getEntryVariables(entry.created_utc, entry.status);
+          const [timeRemainingText, linkLabel, linkStyle] = getEntryVariables(
+            entry.created_utc,
+            entry.status
+          );
 
           const linkStatus = entry.status || "null"; // Keep status for the data-attribute
 
@@ -977,7 +976,6 @@
                                    style="${linkStyle}">
                                     ${linkLabel}
                                 </a>
-                                
                                     ${timeRemainingText}
                                 
                             </li>`;
