@@ -639,9 +639,9 @@
       });
     });
 
-    document
-      .querySelector(".fvm_expired")
-      .addEventListener("click", function (e) {
+    const expiredSpans = document.querySelectorAll(".fvm_expired");
+    expiredSpans.forEach((span) => {
+      span.addEventListener("click", function (e) {
         // 1. Get Data from the sibling link
         const link = this.closest("li").querySelector(".fvm-giveaway-link");
         const author = link.dataset.author;
@@ -668,11 +668,12 @@
         Time since Raffle Closed: ${days}d ${hours}h ${minutes}m
     `;
 
-        showCustomAlert(message, author);
+        showFVMAlert(message, author);
       });
+    });
   };
 
-  function showCustomAlert(text, author) {
+  function showFVMAlert(text, author) {
     // Create a simple overlay
     const modal = document.createElement("div");
     modal.className = "fvm_modal";
