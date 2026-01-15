@@ -1,6 +1,10 @@
 # RedditFarmValleyMergeGiveaway
 Adds a popup to Reddit to show new giveaways for the game Farm Valley Merge and lets the user exclude giveaways that aren't needed.
 
+Before adding the script make sure your desktop/laptop browser has an extension called either GreaseMonkey or TamperMonkey. They may require you to turn developer mode on. Read the instructions provided by the extension.
+
+Once installed click this link: https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
+
 The script does save data offsite but it's very basic and virtually anonymous.
 
 When you first use it you will be asked if you want to use the script. The message is intimidating but you're safe. 
