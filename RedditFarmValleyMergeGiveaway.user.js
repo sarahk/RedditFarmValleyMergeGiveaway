@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
 // @namespace    http://tampermonkey.net/
-// @version      2.40
+// @version      2.41
 // @updateURL    https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://github.com/sarahk/RedditFarmValleyMergeGiveaway/raw/refs/heads/main/RedditFarmValleyMergeGiveaway.user.js
 // @description  Fetches Reddit giveaway/raffle data, filters it, and displays results in a floating pop-up using a centralized API.
@@ -1005,14 +1005,20 @@
     if (totalGiveaways === 0) {
       let noGiveawaysMessage = "No new or active raffles found.";
 
-      // State 2 (No items found AND ingestion failed) - refine the message
       if (!isUpToDate) {
         noGiveawaysMessage =
           "No current sticker raffles found. (Feed may be out of date.)";
       }
 
       popupBody.innerHTML = `<p style="text-align: center; margin-top: 20px;">${noGiveawaysMessage}</p>`;
+
+      // 1. Overwrite the header
       header.innerHTML = `<span>Sticker Raffles (0)</span><button class="fvm-popup-close-btn" id="fvm-close-btn">×</button>`;
+
+      // 2. RE-ATTACH THE LISTENER to the brand new button
+      document.getElementById("fvm-close-btn").addEventListener("click", () => {
+        popup.style.display = "none";
+      });
     } else {
       popupBody.innerHTML = html;
 
