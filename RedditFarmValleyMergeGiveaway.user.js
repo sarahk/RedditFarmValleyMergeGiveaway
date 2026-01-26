@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.06
+// @version      3.08
 // @match        *://*.reddit.com/r/FarmMergeValley*
 // @match        *://*.reddit.com/r/ClubSusan*
 // @connect      reddit.com
@@ -223,7 +223,7 @@
             },
           });
           console.log("FVM_Extractor: Raffle data retrieved:", raffleData);
-          if (!raffleData || raffleData.winner.name.length === 0) return;
+          if (!raffleData || raffleData.winner.name.length === 0) return "";
         } catch (e) {
           console.error("FVM_Extractor: getRaffleData failed", e);
         }
@@ -241,10 +241,12 @@
             },
             "POST"
           );
+          return raffleData.winner.name;
         } catch (e) {
           console.error("FVM_Extractor: Save failed", e);
         }
       }
+      return "";
     },
 
     getPostIdFromUrl() {
@@ -308,7 +310,7 @@
         #fvm-body { padding: 10px; max-height: 400px; overflow-y: auto; color: #333; }
         .fvm-input { width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         .fvm-btn-main { background: #E2852E; color: white; border: none; padding: 8px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .got-it-btn { background: #5a5a8a; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8em; }
+        .got-it-btn { background: #5a5a8a; color: white; border: none; padding: 1px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7em; }
         .gotit-pill { display: inline-block; background-color: #F5C857; color: #333; padding: 2px 8px; margin: 2px; border-radius: 12px; font-size: 0.75em; cursor: pointer; border: 1px solid #d4a017; }
         .fvm-timer { font-size: 0.85em; margin-left: 8px; font-weight: normal; }
         .got-it-pill { transition: all 0.2s ease;}
@@ -343,6 +345,17 @@
     .fvm-raffle-container {margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; overflow: hidden;}
     .fvm-raffle-header {display:flex; justify-content:space-between; background:#f8f8f8; padding: 4px 10px; align-items: center; border-bottom: 1px solid #eee;"}
     .fvm-timer {font-size: 0.85em; color: #666; font-family: monospace;}
+    #fvm-modal-content {font-family: 'Courier New', Courier, monospace; font-size: 13px; min-width: 250px;}
+    .fvm-modal-line { font-family: 'Courier New', Courier, monospace; font-size: 13px;  display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;}
+.fvm-copy-icon { 
+    cursor: pointer; 
+    font-size: 1.1em; 
+    padding: 2px 5px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+.fvm-copy-icon:hover { background: #eee; }
+.fvm-copy-icon:active { transform: scale(0.9); }
     `;
 
       document.head.appendChild(style);
@@ -353,7 +366,13 @@
       const div = document.createElement("div");
       div.id = "fvm-popup";
       div.innerHTML = `
-        <div id="fvm-header"><span style="padding-top: .5em;">🎁 Sticker Raffles</span><button id="fvm-close">×</button></div>
+        <div id="fvm-header">
+          <span style="padding-top: .5em;">🎁 Sticker Raffles</span>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <a href="https://www.reddit.com/chat/user_id/itamer" target="_blank" title="Need Help? Chat with me" style="text-decoration: none; padding: 0 5px; border-radius: 4px; background-color: white;">💬</a>
+          <button id="fvm-close">×</button>
+          </div>
+        </div>
         <div id="fvm-body">Loading...</div>
         <div id="fvm-footer">
           <button id="fvm-refresh" style="flex:1; cursor:pointer;">Refresh</button>
@@ -629,9 +648,15 @@
 
         if (target.classList.contains("fvm-save-winner")) {
           const postId = target.getAttribute("data-postid");
-          FVM_Extractor.saveRaffleData(postId);
+          const winnerName = await FVM_Extractor.saveRaffleData(postId);
           target.textContent = "Saved!";
           target.classList.remove("fvm-save-winner");
+
+          const infoSpan =
+            target.parentElement.querySelector(".fvm-info-trigger");
+          if (infoSpan) {
+            infoSpan.setAttribute("data-winner", winnerName);
+          }
           return;
         }
 
@@ -721,18 +746,41 @@
       const hours = Math.floor((diff % 86400) / 3600);
       const minutes = Math.floor((diff % 3600) / 60);
 
-      const text = `Author: ${author}
+      const created = new Date(createdUtc * 1000).toLocaleString();
+      const textx = `Author: ${author}
 Winner: ${winner}
-Created: ${new Date(createdUtc * 1000).toLocaleString()}
+Created: ${created}
 Time since Raffle Closed: ${days}d ${hours}h ${minutes}m`;
+
+      const winnerCopyButton =
+        winner && winner !== "" && winner !== "null"
+          ? `<span class="fvm-copy-icon" data-copy="${winner}" title="Copy Winner">⧉</span>`
+          : "";
+
+      const text = `<div class="fvm-modal-line">
+            <span>Author: <strong>${author}</strong></span>
+            <span class="fvm-copy-icon" data-copy="${author}" title="Copy Author">⧉</span>
+        </div>
+        <div class="fvm-modal-line">
+            <span>Winner: <strong>${winner}</strong></span>
+            ${winnerCopyButton}
+        </div>
+        <div class="fvm-modal-line" style="border:none;">
+            <span>Created: <strong>${created}</strong></span>
+        </div>
+        <div class="fvm-modal-line" style="border:none;">
+            <span>Closed: <strong>${days}d ${hours}h ${minutes}m ago</strong></span>
+        </div>`;
 
       // 3. Create Modal Element
       const modal = document.createElement("div");
       modal.className = "fvm_modal";
+      modal.style.fontFamily = "'Courier New', Courier, monospace";
+
       modal.innerHTML = `
-            <pre style="white-space: pre-wrap; border-radius: .5em; font-family: sans-serif; font-size: 13px;">${text}</pre>
-            <div style="margin-top:15px; display:flex; gap:10px;">
-                <button id="fvmCloseModal" style="padding: 0 10px; cursor:pointer;">Close</button>
+            <div id="fvm-modal-content" style="font-family: inherit;">${text}</div>
+            <div style="margin-top:15px; display:flex; gap:10px;font-family: sans-serif;">
+                <button id="fvmCloseModal" style="padding: 0 10px; border: 1px solid #f0f0f0; cursor:pointer;">Close</button>
                 <button id="fvmGoAuthor" style="background:#E2852E; color:white; border:none; padding:0 10px; cursor:pointer; border-radius:4px;">Go to Author</button>
             </div>
         `;
@@ -745,6 +793,19 @@ Time since Raffle Closed: ${days}d ${hours}h ${minutes}m`;
         window.open(`https://www.reddit.com/u/${author}`, "_blank");
         modal.remove();
       };
+      // Event Listener for Copy Icons
+      modal.querySelectorAll(".fvm-copy-icon").forEach((icon) => {
+        icon.onclick = () => {
+          const text = icon.getAttribute("data-copy");
+          navigator.clipboard.writeText(text).then(() => {
+            const originalIcon = icon.textContent;
+            icon.textContent = "✅";
+            setTimeout(() => {
+              icon.textContent = originalIcon;
+            }, 2000);
+          });
+        };
+      });
     },
   };
   // Run immediately if document is ready, otherwise wait for load
