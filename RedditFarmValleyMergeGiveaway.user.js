@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.08
+// @version      3.09
 // @match        *://*.reddit.com/r/FarmMergeValley*
 // @match        *://*.reddit.com/r/ClubSusan*
 // @connect      reddit.com
@@ -56,7 +56,7 @@
                 console.warn(
                   "FVM_API.fetch JSON parse error:",
                   e,
-                  res.responseText
+                  res.responseText,
                 );
                 resolve(res.responseText);
               }
@@ -171,7 +171,7 @@
           await FVM_API.sendToServer(
             "post",
             { payload: JSON.stringify(minimalData) },
-            "POST"
+            "POST",
           );
         }
       } catch (e) {
@@ -185,7 +185,7 @@
       if (!title.startsWith(this.GIVEAWAY_PREFIX)) return null;
       const regex = new RegExp(
         `${this.GIVEAWAY_PREFIX}.*?(\\d+)\\s*Star(s)?\\s+(.+?)\\s+Sticker`,
-        "i"
+        "i",
       );
       const match = title.match(regex);
 
@@ -239,7 +239,7 @@
                 ? raffleData.participantIds.length
                 : 0,
             },
-            "POST"
+            "POST",
           );
           return raffleData.winner.name;
         } catch (e) {
@@ -311,18 +311,11 @@
         .fvm-input { width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         .fvm-btn-main { background: #E2852E; color: white; border: none; padding: 8px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .got-it-btn { background: #5a5a8a; color: white; border: none; padding: 1px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7em; }
+        .got-it-btn:hover { background-color: #E2852E; color: white; cursor: pointer;}
         .gotit-pill { display: inline-block; background-color: #F5C857; color: #333; padding: 2px 8px; margin: 2px; border-radius: 12px; font-size: 0.75em; cursor: pointer; border: 1px solid #d4a017; }
         .fvm-timer { font-size: 0.85em; margin-left: 8px; font-weight: normal; }
         .got-it-pill { transition: all 0.2s ease;}
-.got-it-pill:hover {
-    background-color: #ffcccc !important; /* Turns light red on hover */
-    border-color: #ff0000 !important;
-    color: #cc0000 !important;
-}
-.got-it-btn:hover {
-    background-color: #E2852E;
-    color: white;padding: 1px 6px; font-size: 0.7em; cursor: pointer;
-}
+        .got-it-pill:hover { background-color: #ffcccc !important; border-color: #ff0000 !important; color: #cc0000 !important;}
     .fvm_modal {
     position: fixed;
     top: 50%;
@@ -340,7 +333,7 @@
     .fvm-raffle-ok {color:#0079d3;  border-color: #f0f0f0; padding: 0 10px; font-size: smaller;}
     .fvm-gotits-container {display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; padding: 5px; background: #fafafa; border-radius: 4px;}
     #fvm-close {background:none; border:none; color:white; cursor:pointer; font-size:18px;}
-    #fvm-footer {padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px;}
+    #fvm-footer {padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px;align-items: center;}
     #fvm-star-level-header {margin: 10px 0 5px 0; font-weight: bold; color: #444; border-left: 4px solid #E2852E; padding-left: 8px;}
     .fvm-raffle-container {margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; overflow: hidden;}
     .fvm-raffle-header {display:flex; justify-content:space-between; background:#f8f8f8; padding: 4px 10px; align-items: center; border-bottom: 1px solid #eee;"}
@@ -375,6 +368,7 @@
         </div>
         <div id="fvm-body">Loading...</div>
         <div id="fvm-footer">
+        <img src="https://fvm.itamer.com/buynzmade.webp" alt="Buy NZ Made" style="height:24px; margin-bottom: 0;" />
           <button id="fvm-refresh" style="flex:1; cursor:pointer;">Refresh</button>
           <button id="fvm-clear" style="flex:1; cursor:pointer;">Logout</button>
         </div>
@@ -586,7 +580,7 @@
                 post_id: postId,
                 status: newStatus,
               },
-              "POST"
+              "POST",
             );
 
             //console.log(`FVM_UI Link ID '${postId}' updated to '${newStatus}'`);
@@ -638,7 +632,7 @@
                 post_id: postId,
                 status: "done",
               },
-              "POST"
+              "POST",
             );
             target.textContent = "✅";
           } catch (err) {
@@ -668,7 +662,7 @@
               await FVM_API.sendToServer(
                 "gotit",
                 { user: user, keyword: keyword },
-                "POST"
+                "POST",
               );
               this.refreshPopup(); // Reload UI to move sticker to pills
             } catch (err) {
@@ -686,7 +680,7 @@
               await FVM_API.sendToServer(
                 "delete_keyword",
                 { user: user, keyword: keyword },
-                "POST"
+                "POST",
               );
               this.refreshPopup(); // Reload UI to show raffles again
             } catch (err) {
@@ -705,8 +699,8 @@
         const list = Array.isArray(data)
           ? data
           : data
-          ? Object.values(data).flat()
-          : [];
+            ? Object.values(data).flat()
+            : [];
         if (list.length === 0) return;
 
         container.innerHTML = `<div style="font-size:0.75em; color:#888;">Collected:</div>`;
@@ -719,7 +713,7 @@
               await FVM_API.sendToServer(
                 "delete_keyword",
                 { user, keyword: kw },
-                "POST"
+                "POST",
               );
               this.refreshPopup();
             }
