@@ -18,6 +18,25 @@
   const TWENTY_FOUR_HOURS_S = 86400;
   let countdownTimer = null;
 
+  const FVM_Emojis = {
+    trophy: "🏆",
+    flag: "🏁",
+    play: "▶️",
+    next: "⏭️",
+    one: "1️⃣",
+    two: "2️⃣",
+    three: "3️⃣",
+    four: "4️⃣",
+    five: "5️⃣",
+    top: "🔝",
+  };
+
+  const FVM_Colours = {
+    orange: "#f7a01d",
+    blue: "#0079d3",
+    yellow: "#fff3cd",
+  };
+
   // --- 1. API MODULE ---
   const FVM_API = {
     target: "https://fvm.itamer.com/api.php",
@@ -332,7 +351,7 @@
     .fvm-raffle-row:last-child {    border-bottom: none; }
     .fvm-raffle-ok {color:#0079d3;  border-color: #f0f0f0; padding: 0 10px; font-size: smaller;}
     .fvm-gotits-container {display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; padding: 5px; background: #fafafa; border-radius: 4px;}
-    #fvm-close {background:none; border:none; color:white; cursor:pointer; font-size:18px;}
+    #fvm-close {background:none; border:none; color:#E2852E; cursor:pointer; font-size:18px;}
     #fvm-footer {padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px;align-items: center;}
     #fvm-star-level-header {margin: 10px 0 5px 0; font-weight: bold; color: #444; border-left: 4px solid #E2852E; padding-left: 8px;}
     .fvm-raffle-container {margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; overflow: hidden;}
@@ -360,20 +379,26 @@
       div.id = "fvm-popup";
       div.innerHTML = `
         <div id="fvm-header">
-          <span style="padding-top: .5em;">🎁 Sticker Raffles</span>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <a href="https://www.reddit.com/chat/user_id/itamer" target="_blank" title="Need Help? Chat with me" style="text-decoration: none; padding: 0 5px; border-radius: 4px; background-color: white;">💬</a>
-          <button id="fvm-close">×</button>
+          <span style="padding-top: .5em;">🎁 Find Raffles</span>
+          <div style="display: flex; align-items: center; gap: 10px;background-color: #f9f9f9; border-radius: 4px;  padding: 0 5px; font-size: 16px;">
+            <span id="fvm-jump-expired">${FVM_Emojis.flag}</span>
+            <span id="fvm-jump-next">${FVM_Emojis.play}</span>
+          <button id="fvm-close" title='Close'>×</button>
           </div>
         </div>
         <div id="fvm-body">Loading...</div>
         <div id="fvm-footer">
         <img src="https://fvm.itamer.com/buynzmade.webp" alt="Buy NZ Made" style="height:24px; margin-bottom: 0;" />
+          
+            <a href="https://www.reddit.com/chat/user_id/itamer" target="_blank" title="Need Help? Chat with me" style="text-decoration: none; padding: 0 5px; border-radius: 4px; background-color: white;">💬</a>
+         
+          
           <button id="fvm-refresh" style="flex:1; cursor:pointer;">Refresh</button>
           <button id="fvm-clear" style="flex:1; cursor:pointer;">Logout</button>
         </div>
       `;
       document.body.appendChild(div);
+
       document.getElementById("fvm-close").onclick = () =>
         (div.style.display = "none");
       document.getElementById("fvm-clear").onclick = () => {
@@ -382,6 +407,10 @@
       };
       document.getElementById("fvm-refresh").onclick = () =>
         this.refreshPopup();
+      document.getElementById("fvm-jump-expired").onclick = () =>
+        this.jumpToRow("fvm-jump-expired", "fvm_expired");
+      document.getElementById("fvm-jump-next").onclick = () =>
+        this.jumpToRow("fvm-jump-next", "fvm_new");
     },
 
     // New helper to update timer text live
@@ -487,15 +516,19 @@
             const raffleId = raffle.id || raffle.post_id;
 
             const isEntered = raffle.status === "active";
-            let linkColor = isEntered ? "#f7a01d" : "#0079d3";
-            let label = isEntered ? `Entered` : `New Raffle`;
+            let linkColor = isEntered ? FVM_Colours.orange : FVM_Colours.blue;
+            let label = isEntered ? "Entered" : "New Raffle";
+            let rowClass = isEntered ? "fvm_entered" : "fvm_new";
             let btn = "";
             if (isExpired) {
-              linkColor = "#0079d3";
-              if (raffle.winner.length === 0) label = "Done, did you win?";
-              else {
+              linkColor = FVM_Colours.blue;
+              rowClass = "fvm_expired";
+              if (raffle.winner.length === 0) {
+                label = "Done, did you win?";
+              } else {
                 if (raffle.winner === user) {
                   label = "🎉 You won! Claim! 🎉";
+                  rowClass += " fvm_winner";
                 } else {
                   label = `Winner: ${raffle.winner} `;
                   btn = `<button class="fvm-raffle-ok" data-postid="${raffleId}">
@@ -506,7 +539,7 @@
             }
 
             html += `
-                <div class="fvm-raffle-row">
+                <div class="fvm-raffle-row ${rowClass}">
                   <a href="${raffle.url}" 
                     class="fvm-raffle-link" 
                     data-postid="${raffleId}" 
@@ -518,7 +551,7 @@
                   </a>
                   ${btn}
                   <span class="fvm-timer" data-created="${raffle.created_utc}" data-author="${raffle.author}" data-winner="${raffle.winner}" >...</span>
-                            </div>`;
+                </div>`;
           });
           html += `</div></div>`;
         }
@@ -721,6 +754,38 @@
           container.appendChild(p);
         });
       } catch (e) {}
+    },
+
+    jumpToRow(btnSelector, rowSelector) {
+      const nextRow = document.querySelector(`.${rowSelector}`);
+
+      if (nextRow) {
+        // 2. Scroll the element into view smoothly
+        // block: "center" helps ensure it's not hidden behind the header/footer
+        nextRow.scrollIntoView({ behavior: "smooth", block: "center" });
+
+        // 3. Optional: Brief highlight effect so the user sees which one it is
+        const originalBg = nextRow.style.backgroundColor;
+        nextRow.style.backgroundColor = FVM_Colours.yellow; // Light highlight
+        setTimeout(() => {
+          nextRow.style.backgroundColor = originalBg;
+        }, 2000);
+
+        nextRow.classList.remove(rowSelector);
+      } else {
+        this.flashButtonOff(btnSelector);
+      }
+    },
+    flashButtonOff(btnSelector) {
+      console.log("FVM_UI: No rows found for selector:", btnSelector);
+      const btn = document.getElementById(btnSelector);
+      if (btn) {
+        const originalText = btn.textContent;
+        btn.textContent = "❌";
+        setTimeout(() => {
+          btn.textContent = originalText;
+        }, 1000);
+      }
     },
   };
 
