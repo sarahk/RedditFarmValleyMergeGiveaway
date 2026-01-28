@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.10
+// @version      3.11
 // @match        *://*.reddit.com/r/FarmMergeValley*
 // @match        *://*.reddit.com/r/ClubSusan*
 // @connect      reddit.com
@@ -33,6 +33,7 @@
 
   const FVM_Colours = {
     orange: "#f7a01d",
+    darkOrange: "#E2852E",
     blue: "#0079d3",
     yellow: "#fff3cd",
   };
@@ -325,12 +326,12 @@
       style.id = "fvm-style";
       style.textContent = `
         #fvm-popup { z-index: 10000; position: fixed; bottom: 20px; right: 20px; width: 300px; background: #f9f9f9; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); font-family: Arial, sans-serif; display:none; }
-        #fvm-header { background: #E2852E; color: white; padding: 8px 10px; display: flex; justify-content: space-between; border-radius: 8px 8px 0 0; font-weight: bold; }
+        #fvm-header { background: ${FVM_Colours.darkOrange}; color: white; padding: 8px 10px; display: flex; justify-content: space-between; border-radius: 8px 8px 0 0; font-weight: bold; }
         #fvm-body { padding: 10px; max-height: 400px; overflow-y: auto; color: #333; }
         .fvm-input { width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .fvm-btn-main { background: #E2852E; color: white; border: none; padding: 8px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .fvm-btn-main { background: ${FVM_Colours.darkOrange}; color: white; border: none; padding: 8px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .got-it-btn { background: #5a5a8a; color: white; border: none; padding: 1px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7em; }
-        .got-it-btn:hover { background-color: #E2852E; color: white; cursor: pointer;}
+        .got-it-btn:hover { background-color:${FVM_Colours.darkOrange}; color:white ; cursor: pointer;}
         .gotit-pill { display: inline-block; background-color: #F5C857; color: #333; padding: 2px 8px; margin: 2px; border-radius: 12px; font-size: 0.75em; cursor: pointer; border: 1px solid #d4a017; }
         .fvm-timer { font-size: 0.85em; margin-left: 8px; font-weight: normal; }
         .got-it-pill { transition: all 0.2s ease;}
@@ -351,9 +352,9 @@
     .fvm-raffle-row:last-child {    border-bottom: none; }
     .fvm-raffle-ok {color:#0079d3;  border-color: #f0f0f0; padding: 0 10px; font-size: smaller;}
     .fvm-gotits-container {display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; padding: 5px; background: #fafafa; border-radius: 4px;}
-    #fvm-close {background:none; border:none; color:#E2852E; cursor:pointer; font-size:18px;}
+    #fvm-close {background:none; border:none; color: ${FVM_Colours.darkOrange}; cursor:pointer; font-size:18px;}
     #fvm-footer {padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px;align-items: center;}
-    #fvm-star-level-header {margin: 10px 0 5px 0; font-weight: bold; color: #444; border-left: 4px solid #E2852E; padding-left: 8px;}
+    #fvm-star-level-header {margin: 10px 0 5px 0; font-weight: bold; color: #444; border-left: 4px solid ${FVM_Colours.darkOrange}; padding-left: 8px;}
     .fvm-raffle-container {margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; overflow: hidden;}
     .fvm-raffle-header {display:flex; justify-content:space-between; background:#f8f8f8; padding: 4px 10px; align-items: center; border-bottom: 1px solid #eee;"}
     .fvm-timer {font-size: 0.85em; color: #666; font-family: monospace;}
@@ -502,7 +503,7 @@
           html += `
             <div class="fvm-raffle-container" >
               <div class="fvm-raffle-header" >
-                <strong style="color:#E2852E; font-size: 0.8em;">${stickerName.toUpperCase()} ${starCount}</strong>
+                <strong style="color:${FVM_Colours.darkOrange}; font-size: 0.8em;">${stickerName.toUpperCase()} ${starCount}</strong>
                 <button class="got-it-btn" data-keyword="${stickerName}" >Got It!</button>
               </div>
               <div style="padding: 2px 8px;">
@@ -617,11 +618,23 @@
             );
 
             //console.log(`FVM_UI Link ID '${postId}' updated to '${newStatus}'`);
-            target.style.color = "#f7a01d"; // Change color to indicate entered
+            target.style.color = FVM_Colours.orange; // Change color to indicate entered
             target.innerHTML = isExpired ? "✅ Checked" : "✅ Entered"; // Update label
             // Optional: Refresh data to show the "(Entered)" label immediately
             //this.refreshPopup();
             // 2. Create the separate clickable span
+
+            // clear the classes that indicate new/expired if the user has already clicked on them
+            const row = target.closest(".fvm-raffle-row");
+
+            // 2. Remove the fvm_new class if it exists
+            if (row && row.classList.contains("fvm_new")) {
+              row.classList.remove("fvm_new");
+            }
+            if (row && row.classList.contains("fvm_expired")) {
+              row.classList.remove("fvm_expired");
+            }
+            // end of clearing classes
 
             if (newStatus === "done" && winner.length === 0) {
               // because the save button looks at the current url the user can't save unless they're on the page
