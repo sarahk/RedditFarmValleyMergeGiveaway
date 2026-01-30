@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.11
+// @version      3.13
 // @match        *://*.reddit.com/r/FarmMergeValley*
 // @match        *://*.reddit.com/r/ClubSusan*
 // @connect      reddit.com
@@ -29,6 +29,7 @@
     four: "4️⃣",
     five: "5️⃣",
     top: "🔝",
+    zap: "⚡",
   };
 
   const FVM_Colours = {
@@ -332,43 +333,25 @@
         .fvm-btn-main { background: ${FVM_Colours.darkOrange}; color: white; border: none; padding: 8px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .got-it-btn { background: #5a5a8a; color: white; border: none; padding: 1px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7em; }
         .got-it-btn:hover { background-color:${FVM_Colours.darkOrange}; color:white ; cursor: pointer;}
-        .gotit-pill { display: inline-block; background-color: #F5C857; color: #333; padding: 2px 8px; margin: 2px; border-radius: 12px; font-size: 0.75em; cursor: pointer; border: 1px solid #d4a017; }
-        .fvm-timer { font-size: 0.85em; margin-left: 8px; font-weight: normal; }
-        .got-it-pill { transition: all 0.2s ease;}
+        .got-it-pill {transition: all 0.2s ease;background: #e0e0e0; color: #666; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; cursor: pointer; border: 1px solid #ccc;}
         .got-it-pill:hover { background-color: #ffcccc !important; border-color: #ff0000 !important; color: #cc0000 !important;}
-    .fvm_modal {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: white;
-    padding: 20px;
-    border: 2px solid #333;
-    border-radius: .5em;
-    z-index: 10001; /* Higher than popup */
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-}
-    .fvm-raffle-row { padding: 4px 0; font-size: 0.85em; display: flex; justify-content: space-between; align-items: center;    border-bottom: 1px solid #f0f0f0; }
-    .fvm-raffle-row:last-child {    border-bottom: none; }
-    .fvm-raffle-ok {color:#0079d3;  border-color: #f0f0f0; padding: 0 10px; font-size: smaller;}
-    .fvm-gotits-container {display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; padding: 5px; background: #fafafa; border-radius: 4px;}
-    #fvm-close {background:none; border:none; color: ${FVM_Colours.darkOrange}; cursor:pointer; font-size:18px;}
-    #fvm-footer {padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px;align-items: center;}
-    #fvm-star-level-header {margin: 10px 0 5px 0; font-weight: bold; color: #444; border-left: 4px solid ${FVM_Colours.darkOrange}; padding-left: 8px;}
-    .fvm-raffle-container {margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; overflow: hidden;}
-    .fvm-raffle-header {display:flex; justify-content:space-between; background:#f8f8f8; padding: 4px 10px; align-items: center; border-bottom: 1px solid #eee;"}
-    .fvm-timer {font-size: 0.85em; color: #666; font-family: monospace;}
-    #fvm-modal-content {font-family: 'Courier New', Courier, monospace; font-size: 13px; min-width: 250px;}
-    .fvm-modal-line { font-family: 'Courier New', Courier, monospace; font-size: 13px;  display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;}
-.fvm-copy-icon { 
-    cursor: pointer; 
-    font-size: 1.1em; 
-    padding: 2px 5px;
-    border-radius: 4px;
-    transition: background 0.2s;
-}
-.fvm-copy-icon:hover { background: #eee; }
-.fvm-copy-icon:active { transform: scale(0.9); }
+        .fvm-timer {font-size: 0.85em; margin-left: 8px; font-weight: normal; }
+        .fvm_modal {position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 2px solid #333; border-radius: .5em; z-index: 10001; /* Higher than popup */ box-shadow: 0 4px 15px rgba(0,0,0,0.3);}
+        .fvm-raffle-row { padding: 4px 0; font-size: 0.85em; display: flex; justify-content: space-between; align-items: center;    border-bottom: 1px solid #f0f0f0; }
+        .fvm-raffle-row:last-child {border-bottom: none; }
+        .fvm-raffle-ok {color:#0079d3;  border-color: #f0f0f0; padding: 0 10px; font-size: smaller;}
+        .fvm-gotits-container {display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; padding: 5px; background: #fafafa; border-radius: 4px;}
+        #fvm-close {background:none; border:none; color: ${FVM_Colours.darkOrange}; cursor:pointer; font-size:18px;}
+        #fvm-footer {padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px;align-items: center;}
+        #fvm-footer a, #fvm-footer span { background-color: transparent !important; line-height: 1; /* Prevents extra vertical space that can cause background bleeding */ display: inline-flex; align-items: center; mix-blend-mode: multiply; }        #fvm-star-level-header {margin: 10px 0 5px 0; font-weight: bold; color: #444; border-left: 4px solid ${FVM_Colours.darkOrange}; padding-left: 8px;}
+        .fvm-raffle-container {margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; overflow: hidden;}
+        .fvm-raffle-header {display:flex; justify-content:space-between; background:#f8f8f8; padding: 4px 10px; align-items: center; border-bottom: 1px solid #eee;"}
+        .fvm-timer {font-size: 0.85em; color: #666; font-family: monospace;}
+        #fvm-modal-content {font-family: 'Courier New', Courier, monospace; font-size: 13px; min-width: 250px;}
+        .fvm-modal-line { font-family: 'Courier New', Courier, monospace; font-size: 13px;  display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;}
+        .fvm-copy-icon {cursor: pointer; font-size: 1.1em; padding: 2px 5px; border-radius: 4px; transition: background 0.2s;}
+        .fvm-copy-icon:hover { background: #eee; }
+        .fvm-copy-icon:active { transform: scale(0.9); }
     `;
 
       document.head.appendChild(style);
@@ -564,11 +547,11 @@
             "<span style='font-size:0.75em; color:#888; width:100%;'>Collected Stickers (click to reactivate):</span>";
           gotItData[starLevel].forEach((pillName) => {
             html += `
-              <span class="got-it-pill" data-keyword="${pillName}" style="background: #e0e0e0; color: #666; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; cursor: pointer; border: 1px solid #ccc;">
+              <span class="got-it-pill" data-keyword="${pillName}" data-stars="${starLevel}" >
                 ${pillName} ✕
               </span>`;
           });
-          html += `</div>`;
+          html += `<span class="got-it-pill" data-keyword="all" data-stars="${starLevel}" >${FVM_Emojis.zap} All ✕ </span></div>`;
         }
       });
 
@@ -681,6 +664,8 @@
               "POST",
             );
             target.textContent = "✅";
+            const row = target.closest(".fvm-raffle-row");
+            row.classList.remove("fvm_expired");
           } catch (err) {
             console.error("Error updating raffle as done - ok button:", err);
           }
@@ -703,36 +688,41 @@
         // --- RESTORED: GOT IT BUTTON ---
         if (target.classList.contains("got-it-btn")) {
           const keyword = target.getAttribute("data-keyword");
-          if (confirm(`Mark '${keyword}' as collected?`)) {
-            try {
-              await FVM_API.sendToServer(
-                "gotit",
-                { user: user, keyword: keyword },
-                "POST",
-              );
-              this.refreshPopup(); // Reload UI to move sticker to pills
-            } catch (err) {
-              console.error("Error saving 'Got It':", err);
-            }
+          //if (confirm(`Mark '${keyword}' as collected?`)) {
+          try {
+            await FVM_API.sendToServer(
+              "gotit",
+              { user: user, keyword: keyword },
+              "POST",
+            );
+            this.refreshPopup(); // Reload UI to move sticker to pills
+          } catch (err) {
+            console.error("Error saving 'Got It':", err);
           }
+          //}
           return;
         }
 
         // --- RESTORED: PILL REMOVAL ---
         if (target.classList.contains("got-it-pill")) {
           const keyword = target.getAttribute("data-keyword");
-          if (confirm(`Reactivate tracking for '${keyword}'?`)) {
-            try {
-              await FVM_API.sendToServer(
-                "delete_keyword",
-                { user: user, keyword: keyword },
-                "POST",
-              );
-              this.refreshPopup(); // Reload UI to show raffles again
-            } catch (err) {
-              console.error("Error deleting keyword:", err);
-            }
+          const what =
+            keyword === "all" ? "delete_all_keywords" : "delete_keyword";
+          const stars = target.getAttribute("data-stars");
+
+          console.log("Reactivating keyword:", keyword, what);
+          //if (confirm(`Reactivate tracking for '${keyword}'?`)) {
+          try {
+            await FVM_API.sendToServer(
+              what,
+              { user: user, keyword: keyword, stars: stars },
+              "POST",
+            );
+            this.refreshPopup(); // Reload UI to show raffles again
+          } catch (err) {
+            console.error("Error deleting keyword:", err);
           }
+          //}
           return;
         }
       };
@@ -755,14 +745,14 @@
           p.className = "gotit-pill";
           p.textContent = kw;
           p.onclick = async () => {
-            if (confirm(`Reactivate ${kw}?`)) {
-              await FVM_API.sendToServer(
-                "delete_keyword",
-                { user, keyword: kw },
-                "POST",
-              );
-              this.refreshPopup();
-            }
+            //if (confirm(`Reactivate ${kw}?`)) {
+            await FVM_API.sendToServer(
+              "delete_keyword",
+              { user: user, keyword: kw },
+              "POST",
+            );
+            this.refreshPopup();
+            //}
           };
           container.appendChild(p);
         });
