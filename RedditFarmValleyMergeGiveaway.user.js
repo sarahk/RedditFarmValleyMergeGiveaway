@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.13
+// @version      3.14
 // @match        *://*.reddit.com/r/FarmMergeValley*
 // @match        *://*.reddit.com/r/ClubSusan*
 // @connect      reddit.com
@@ -30,6 +30,7 @@
     five: "5️⃣",
     top: "🔝",
     zap: "⚡",
+    hourglass: "⌛",
   };
 
   const FVM_Colours = {
@@ -68,11 +69,11 @@
             if (res.status >= 200 && res.status < 300) {
               try {
                 resolve(JSON.parse(res.responseText));
-                console.log([
-                  "FVM_API.fetch response parsed as JSON:",
-                  res.responseText,
-                  options,
-                ]);
+                // console.log([
+                //   "FVM_API.fetch response parsed as JSON:",
+                //   res.responseText,
+                //   options,
+                // ]);
               } catch (e) {
                 console.warn(
                   "FVM_API.fetch JSON parse error:",
@@ -104,8 +105,8 @@
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         body = new URLSearchParams({ what: action, ...data }).toString();
       }
-      console.log(["FVM_API.sendToServer:", method, url]);
-      console.log(["FVM_API.sendToServer:", body]);
+      //console.log(["FVM_API.sendToServer:", method, url]);
+      //console.log(["FVM_API.sendToServer:", body]);
 
       return this.fetch({ method, url, headers, data: body });
     },
@@ -243,7 +244,7 @@
               Accept: "application/json",
             },
           });
-          console.log("FVM_Extractor: Raffle data retrieved:", raffleData);
+          //console.log("FVM_Extractor: Raffle data retrieved:", raffleData);
           if (!raffleData || raffleData.winner.name.length === 0) return "";
         } catch (e) {
           console.error("FVM_Extractor: getRaffleData failed", e);
@@ -277,7 +278,7 @@
       // In this specific path, 'comments' is at index 3, and the ID is at index 4
       const postId = segments[segments.indexOf("comments") + 1];
 
-      console.log("FVM_Extractor getPostIdFromUrl", postId);
+      //console.log("FVM_Extractor getPostIdFromUrl", postId);
       return postId;
     },
 
@@ -326,7 +327,7 @@
       const style = document.createElement("style");
       style.id = "fvm-style";
       style.textContent = `
-        #fvm-popup { z-index: 10000; position: fixed; bottom: 20px; right: 20px; width: 300px; background: #f9f9f9; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); font-family: Arial, sans-serif; display:none; }
+        #fvm-popup { z-index: 10000; display: block; position: fixed; bottom: 20px; right: 20px; width: 300px; background: #f9f9f9; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); font-family: Arial, sans-serif; display:none; }
         #fvm-header { background: ${FVM_Colours.darkOrange}; color: white; padding: 8px 10px; display: flex; justify-content: space-between; border-radius: 8px 8px 0 0; font-weight: bold; }
         #fvm-body { padding: 10px; max-height: 400px; overflow-y: auto; color: #333; }
         .fvm-input { width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
@@ -367,16 +368,14 @@
           <div style="display: flex; align-items: center; gap: 10px;background-color: #f9f9f9; border-radius: 4px;  padding: 0 5px; font-size: 16px;">
             <span id="fvm-jump-expired">${FVM_Emojis.flag}</span>
             <span id="fvm-jump-next">${FVM_Emojis.play}</span>
+            <span id="fvm-jump-oldest">${FVM_Emojis.hourglass}</span>
           <button id="fvm-close" title='Close'>×</button>
           </div>
         </div>
         <div id="fvm-body">Loading...</div>
         <div id="fvm-footer">
-        <img src="https://fvm.itamer.com/buynzmade.webp" alt="Buy NZ Made" style="height:24px; margin-bottom: 0;" />
-          
-            <a href="https://www.reddit.com/chat/user_id/itamer" target="_blank" title="Need Help? Chat with me" style="text-decoration: none; padding: 0 5px; border-radius: 4px; background-color: white;">💬</a>
-         
-          
+          <img src="https://fvm.itamer.com/buynzmade.webp" alt="Buy NZ Made" style="height:24px; margin-bottom: 0;" />
+          <a href="https://www.reddit.com/chat/user_id/itamer" target="_blank" title="Need Help? Chat with me" style="text-decoration: none; padding: 0 5px; border-radius: 4px; background-color: white;">💬</a>
           <button id="fvm-refresh" style="flex:1; cursor:pointer;">Refresh</button>
           <button id="fvm-clear" style="flex:1; cursor:pointer;">Logout</button>
         </div>
@@ -395,6 +394,8 @@
         this.jumpToRow("fvm-jump-expired", "fvm_expired");
       document.getElementById("fvm-jump-next").onclick = () =>
         this.jumpToRow("fvm-jump-next", "fvm_new");
+      document.getElementById("fvm-jump-oldest").onclick = () =>
+        this.jumpToRow("fvm-jump-oldest", "fvm-new");
     },
 
     // New helper to update timer text live
@@ -523,7 +524,7 @@
             }
 
             html += `
-                <div class="fvm-raffle-row ${rowClass}">
+                <div id="fvm-${raffleId}" class="fvm-raffle-row ${rowClass}">
                   <a href="${raffle.url}" 
                     class="fvm-raffle-link" 
                     data-postid="${raffleId}" 
@@ -582,14 +583,20 @@
 
         // --- NEW: HANDLE RAFFLE LINK CLICK ---
         if (target.classList.contains("fvm-raffle-link")) {
+          const destination = target.href;
+
+          e.preventDefault();
+          e.stopPropagation();
           const postId = target.getAttribute("data-postid");
           const status = target.getAttribute("data-status");
           const winner = target.getAttribute("data-winner");
           const isExpired = target.getAttribute("data-isexpired") === "true";
           const newStatus = isExpired ? "done" : "active";
-          if (status === newStatus) return; // No change needed
+          if (status === newStatus) {
+            this.goToDestination(destination);
+            return; // No change needed
+          }
           try {
-            // Replicating your old sendLinkStatus logic
             await FVM_API.sendToServer(
               "link",
               {
@@ -600,24 +607,21 @@
               "POST",
             );
 
-            //console.log(`FVM_UI Link ID '${postId}' updated to '${newStatus}'`);
             target.style.color = FVM_Colours.orange; // Change color to indicate entered
             target.innerHTML = isExpired ? "✅ Checked" : "✅ Entered"; // Update label
-            // Optional: Refresh data to show the "(Entered)" label immediately
-            //this.refreshPopup();
-            // 2. Create the separate clickable span
 
             // clear the classes that indicate new/expired if the user has already clicked on them
             const row = target.closest(".fvm-raffle-row");
-
-            // 2. Remove the fvm_new class if it exists
-            if (row && row.classList.contains("fvm_new")) {
-              row.classList.remove("fvm_new");
+            if (row) {
+              // 2. Remove the fvm_new class if it exists
+              if (row.classList.contains("fvm_new")) {
+                row.classList.remove("fvm_new");
+              }
+              if (row.classList.contains("fvm_expired")) {
+                row.classList.remove("fvm_expired");
+              }
+              // end of clearing classes
             }
-            if (row && row.classList.contains("fvm_expired")) {
-              row.classList.remove("fvm_expired");
-            }
-            // end of clearing classes
 
             if (newStatus === "done" && winner.length === 0) {
               // because the save button looks at the current url the user can't save unless they're on the page
@@ -633,12 +637,9 @@
               saveBtn.className = "fvm-save-winner";
               saveBtn.setAttribute("data-postid", postId);
               saveBtn.innerHTML = "💾 Save";
-
               // 3. Add some style to make it look clickable
               saveBtn.style.cursor = "pointer";
-              //saveBtn.style.textDecoration = "underline";
               saveBtn.style.marginLeft = "8px";
-              //saveBtn.style.color = "#FF4500"; // Reddit Orange-Red
 
               // 4. Append it as a new child of the link
               target.after(saveBtn);
@@ -646,6 +647,8 @@
           } catch (err) {
             console.error("Error updating link status:", err);
           }
+
+          this.goToDestination(destination);
           return; // Let the default anchor behavior open the link
         }
 
@@ -728,6 +731,21 @@
       };
     },
 
+    goToDestination(destination) {
+      const routerLink = document.createElement("a");
+      routerLink.href = destination;
+      routerLink.style.display = "none";
+
+      // In Reddit's SPA, we often need to ensure the event isn't
+      // cancelled by other listeners, so we dispatch it manually.
+      document.body.appendChild(routerLink);
+
+      setTimeout(() => {
+        routerLink.click(); // Reddit's SPA router should catch this
+        routerLink.remove();
+      }, 100);
+    },
+
     async renderPills(user) {
       const container = document.getElementById("fvm-pills");
       try {
@@ -759,8 +777,38 @@
       } catch (e) {}
     },
 
+    findOldestNewRaffle() {
+      let best = null;
+
+      const popBody = document.getElementById("fvm-body");
+      const rows = popBody.querySelectorAll(".fvm-raffle-row.fvm_new");
+
+      for (const row of rows) {
+        const timer = row.querySelector(".fvm-timer[data-created]");
+        if (!timer) continue;
+
+        const created = Number(timer.dataset.created);
+        if (!Number.isFinite(created)) continue;
+
+        if (!best || created < best.created) {
+          best = {
+            row,
+            created,
+            link: row.querySelector(".fvm-raffle-link"),
+          };
+        }
+      }
+
+      return best.link;
+    },
+
     jumpToRow(btnSelector, rowSelector) {
-      const nextRow = document.querySelector(`.${rowSelector}`);
+      let nextRow;
+      if (btnSelector === "fvm-jump-oldest") {
+        nextRow = this.findOldestNewRaffle();
+      } else {
+        nextRow = document.querySelector(`.${rowSelector}`);
+      }
 
       if (nextRow) {
         // 2. Scroll the element into view smoothly
