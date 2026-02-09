@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.14
+// @version      3.15
 // @match        *://*.reddit.com/r/FarmMergeValley*
 // @match        *://*.reddit.com/r/ClubSusan*
 // @connect      reddit.com
@@ -126,9 +126,9 @@
   // --- 2. Import MODULE (Requirements 1 & 2) ---
   const FVM_Importer = {
     REDDIT_FEED_URL:
-      "https://www.reddit.com/r/FarmMergeValley/search.json?q=flair_name%3A%22%F0%9F%8E%81+Raffles%2FGiveaways%22&restrict_sr=1&sort=new&t=month",
+      "https://www.reddit.com/r/FarmMergeValley/search.json?q=flair_name%3A%22%F0%9F%8E%81+Raffles%2FGiveaways%22&restrict_sr=1&sort=new&t=month&limit=100",
     REDDIT_SEARCH_URL:
-      "https://www.reddit.com/r/FarmMergeValley/search.json?restrict_sr=1&sort=new&t=month",
+      "https://www.reddit.com/r/FarmMergeValley/search.json?restrict_sr=1&sort=new&t=month&restrict_sr=1&sort=new&limit=100",
     //const USER_AGENT = "browser:FarmMergeValley-Sticker-App:v2.4 (by /u/itamer)";
     GIVEAWAY_PREFIX: "[Sticker Giveaway]",
 
@@ -148,8 +148,7 @@
           if (Array.isArray(keywords)) {
             for (const kw of keywords) {
               const searchUrl =
-                this.REDDIT_SEARCH_URL +
-                `&q=${encodeURIComponent(kw)}&restrict_sr=1&sort=new`;
+                this.REDDIT_SEARCH_URL + `&q=${encodeURIComponent(kw)}`;
               await this.getJsonAndSend(searchUrl);
               console.log(`FVM_Importer: Imported keyword '${kw}'`);
             }
@@ -428,10 +427,12 @@
     async refreshPopup() {
       const user = localStorage.getItem("fvm_user_id");
       const body = document.getElementById("fvm-body");
+      const defaultName = this.getRedditUsername();
+      console.log("[FVM] default Name", defaultName);
       if (!user) {
         body.innerHTML = `
           <p>Enter your username:</p>
-          <input type="text" id="fvm-user-in" class="fvm-input" placeholder="Reddit Username">
+          <input type="text" id="fvm-user-in" class="fvm-input" placeholder="Reddit Username" value="${defaultName}">
           <button id="fvm-save-btn" class="fvm-btn-main">Save</button>
         `;
         document.getElementById("fvm-popup").style.display = "block";
@@ -837,6 +838,44 @@
           btn.textContent = originalText;
         }, 1000);
       }
+    },
+
+    getRedditUsername() {
+      // 1. Old Reddit / RES (Based on your provided HTML)
+      // Targets the <a> inside <span class="user">
+      const oldRedditSpan = document.querySelector(
+        'span.user > a[href*="/user/"]',
+      );
+      if (oldRedditSpan) {
+        const name = oldRedditSpan.textContent.trim();
+        if (name && name !== "login" && name !== "register") return name;
+      }
+
+      // 2. sh.reddit.com (Modern Root Attribute)
+      const shredditApp = document.querySelector("shreddit-app[user-name]");
+      if (shredditApp) {
+        const name = shredditApp.getAttribute("user-name");
+        if (name) return name;
+      }
+
+      // 3. New Reddit Redesign (Account Menu)
+      const redesignMenu = document.querySelector(
+        "#header-user-dropdown-button span:last-child",
+      );
+      if (redesignMenu) {
+        return redesignMenu.textContent.replace("u/", "").trim();
+      }
+
+      // 4. Global JSON-LD fallback (Safe for both)
+      const userJson = document.getElementById("data");
+      if (userJson) {
+        try {
+          const data = JSON.parse(userJson.textContent);
+          if (data.user && data.user.name) return data.user.name;
+        } catch (e) {}
+      }
+
+      return "";
     },
   };
 
