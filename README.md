@@ -30,3 +30,9 @@ When you first use it you will be asked if you want to use the script. The messa
 Choose "Always Allow"
 
 This script is still experimental. Let me know if anything breaks or if you have suggestions.
+
+**Frequently Asked Questions**
+
+Some users report having trouble saving their username. If you are having problems please get in touch - there's a chat button at the bottom of the popup. Old Reddit and New Reddit will both ask you for your username, this is normal behaviour that I can't get around. New Reddit is the login name that matters.
+
+**Firefox** - a few known issues that I haven't had time to resolve. Chrome, Safari, and Brave behave normally.
