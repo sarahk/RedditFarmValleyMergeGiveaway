@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.15
+// @version      3.16
 // @match        *://*.reddit.com/r/FarmMergeValley*
 // @match        *://*.reddit.com/r/ClubSusan*
 // @connect      reddit.com
@@ -9,6 +9,7 @@
 // @grant        GM.xmlHttpRequest
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
+// @grant        GM_info
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -38,7 +39,13 @@
     darkOrange: "#E2852E",
     blue: "#0079d3",
     yellow: "#fff3cd",
+    gray: "#666666",
+    coral: "#d14d28",
+    red: "#c2410c",
+    garnet: "#8b0000",
   };
+
+  const FVM_SCRIPT_VERSION = GM_info?.script?.version || "dev";
 
   // --- 1. API MODULE ---
   const FVM_API = {
@@ -133,7 +140,7 @@
     GIVEAWAY_PREFIX: "[Sticker Giveaway]",
 
     async runInitialImport() {
-      console.log("FVM_Importer: Running initial 25-post import...");
+      console.info("FVM_Importer: Running initial 25-post import...");
       await this.getJsonAndSend(this.REDDIT_FEED_URL);
     },
 
@@ -142,7 +149,7 @@
       const now = Date.now();
 
       if (!lastRun || now - parseInt(lastRun) > 3600000) {
-        console.log("FVM_Importer: Running hourly keyword import...");
+        console.info("FVM_Importer: Running hourly keyword import...");
         try {
           const keywords = await FVM_API.sendToServer("keywords", {}, "GET");
           if (Array.isArray(keywords)) {
@@ -150,7 +157,7 @@
               const searchUrl =
                 this.REDDIT_SEARCH_URL + `&q=${encodeURIComponent(kw)}`;
               await this.getJsonAndSend(searchUrl);
-              console.log(`FVM_Importer: Imported keyword '${kw}'`);
+              console.info(`FVM_Importer: Imported keyword '${kw}'`);
             }
           }
           localStorage.setItem("fvm_last_hourly", now.toString());
@@ -314,11 +321,55 @@
   // --- 2. UI MODULE ---
   const FVM_UI = {
     init() {
-      console.log("FVM_UI: Initializing...");
+      console.info("FVM_UI: Initializing...");
       this.injectStyles();
       this.drawPopup();
       this.refreshPopup();
       this.startGlobalTimer();
+      //this.setupObserver();
+    },
+
+    setupObserver() {
+      const targetNode = document.getElementById("fvm-body");
+      if (!targetNode) return;
+
+      // const observer = new MutationObserver((mutations) => {
+      //   mutations.forEach((mutation) => {
+      //     mutation.addedNodes.forEach((node) => {
+      //       // Check if any newly added nodes are (or contain) our links
+      //       if (node.nodeType === 1) {
+      //         const links = node.classList?.contains("fvm-raffle-link")
+      //           ? [node]
+      //           : node.querySelectorAll(".fvm-raffle-link");
+
+      //         // This forces a re-paint check by the browser
+      //         // which ensures your [data-state] CSS kicks in
+      //         links.forEach((link) => {
+      //           if (link.dataset.state) {
+      //             // Refresh the attribute to trigger the CSS engine
+      //             const currentState = link.dataset.state;
+      //             link.setAttribute("data-state", currentState);
+      //           }
+      //         });
+      //       }
+      //     });
+      //   });
+      // });
+      const observer = new MutationObserver((mutations) => {
+        // This only fires when the content INSIDE #fvm-body changes
+        mutations.forEach((mutation) => {
+          if (mutation.addedNodes.length) {
+            // Since we are already inside the popup, we can just
+            // let the CSS engine handle it, or force a class check here.
+            console.log("FVM: Popup content updated, styles refreshed.");
+          }
+        });
+      });
+
+      observer.observe(targetNode, {
+        childList: true,
+        subtree: true,
+      });
     },
 
     injectStyles() {
@@ -339,22 +390,39 @@
         .fvm_modal {position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 2px solid #333; border-radius: .5em; z-index: 10001; /* Higher than popup */ box-shadow: 0 4px 15px rgba(0,0,0,0.3);}
         .fvm-raffle-row { padding: 4px 0; font-size: 0.85em; display: flex; justify-content: space-between; align-items: center;    border-bottom: 1px solid #f0f0f0; }
         .fvm-raffle-row:last-child {border-bottom: none; }
-        .fvm-raffle-ok {color:#0079d3;  border-color: #f0f0f0; padding: 0 10px; font-size: smaller;}
+        .fvm-raffle-ok {color: ${FVM_Colours.blue};  border-color: #f0f0f0; padding: 0 10px; font-size: smaller;}
         .fvm-gotits-container {display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; padding: 5px; background: #fafafa; border-radius: 4px;}
         #fvm-close {background:none; border:none; color: ${FVM_Colours.darkOrange}; cursor:pointer; font-size:18px;}
-        #fvm-footer {padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px;align-items: center;}
+        #fvm-footer {padding: 10px; border-top: 1px solid #eee; display: flex; gap: 8px;align-items: center;}
         #fvm-footer a, #fvm-footer span { background-color: transparent !important; line-height: 1; /* Prevents extra vertical space that can cause background bleeding */ display: inline-flex; align-items: center; mix-blend-mode: multiply; }        #fvm-star-level-header {margin: 10px 0 5px 0; font-weight: bold; color: #444; border-left: 4px solid ${FVM_Colours.darkOrange}; padding-left: 8px;}
         .fvm-raffle-container {margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; overflow: hidden;}
-        .fvm-raffle-header {display:flex; justify-content:space-between; background:#f8f8f8; padding: 4px 10px; align-items: center; border-bottom: 1px solid #eee;"}
+        .fvm-raffle-header {display:flex; justify-content:space-between; background:#f8f8f8; padding: 4px 10px; align-items: center; border-bottom: 1px solid #eee;}
         .fvm-timer {font-size: 0.85em; color: #666; font-family: monospace;}
         #fvm-modal-content {font-family: 'Courier New', Courier, monospace; font-size: 13px; min-width: 250px;}
         .fvm-modal-line { font-family: 'Courier New', Courier, monospace; font-size: 13px;  display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;}
         .fvm-copy-icon {cursor: pointer; font-size: 1.1em; padding: 2px 5px; border-radius: 4px; transition: background 0.2s;}
         .fvm-copy-icon:hover { background: #eee; }
         .fvm-copy-icon:active { transform: scale(0.9); }
-    `;
+.fvm-raffle-link[data-state="new"]{color: ${FVM_Colours.blue} !important;}
+.fvm-raffle-link[data-state="entered"]{color: ${FVM_Colours.darkOrange} !important;}
+.fvm-raffle-link[data-state="expired"]{color: ${FVM_Colours.blue} !important;}
+.fvm-raffle-link[data-state="missed"]{color: ${FVM_Colours.gray} !important;}
+.fvm-raffle-link[data-state="checked"]{color: ${FVM_Colours.gray} !important;}
+.fvm-raffle-link{text-decoration: none !important;}
+.fvm-timer[data-state="expired"]{color: ${FVM_Colours.gray};}
+.fvm-timer[data-state="expiring"]{color: ${FVM_Colours.red};}
+.fvm-timer[data-state="ok"]{color: ${FVM_Colours.blue};}
+      `;
 
       document.head.appendChild(style);
+    },
+    labels: {
+      youwon: "🎉 You won! Claim! 🎉",
+      expired: "• Expired Raffle",
+      doneCheck: "• Done, did you win?",
+      entered: "• Entered",
+      new: "• New Raffle",
+      timeExpired: "ℹ️ Expired",
     },
 
     drawPopup() {
@@ -373,7 +441,10 @@
         </div>
         <div id="fvm-body">Loading...</div>
         <div id="fvm-footer">
-          <img src="https://fvm.itamer.com/buynzmade.webp" alt="Buy NZ Made" style="height:24px; margin-bottom: 0;" />
+          <div style="display: flex; flex-direction: column; align-items: center; line-height: 1;">
+            <img src="https://fvm.itamer.com/buynzmade.webp" alt="Buy NZ Made" style="height:24px; margin-bottom: 2px;" />
+            <span style="font-size: 8px; color: #999; font-family: sans-serif;">${FVM_SCRIPT_VERSION}</span>
+          </div>
           <a href="https://www.reddit.com/chat/user_id/itamer" target="_blank" title="Need Help? Chat with me" style="text-decoration: none; padding: 0 5px; border-radius: 4px; background-color: white;">💬</a>
           <button id="fvm-refresh" style="flex:1; cursor:pointer;">Refresh</button>
           <button id="fvm-clear" style="flex:1; cursor:pointer;">Logout</button>
@@ -387,41 +458,105 @@
         localStorage.removeItem("fvm_user_id");
         this.refreshPopup();
       };
-      document.getElementById("fvm-refresh").onclick = () =>
+      document.getElementById("fvm-refresh").onclick = () => {
+        FVM_Importer.runInitialImport();
         this.refreshPopup();
+      };
       document.getElementById("fvm-jump-expired").onclick = () =>
-        this.jumpToRow("fvm-jump-expired", "fvm_expired");
+        this.jumpToRow("fvm-jump-expired", "expired");
       document.getElementById("fvm-jump-next").onclick = () =>
-        this.jumpToRow("fvm-jump-next", "fvm_new");
+        this.jumpToRow("fvm-jump-next", "new");
       document.getElementById("fvm-jump-oldest").onclick = () =>
-        this.jumpToRow("fvm-jump-oldest", "fvm-new");
+        this.jumpToRow("fvm-jump-oldest", "new");
     },
 
     // New helper to update timer text live
     updateTimers() {
       const now = Math.floor(Date.now() / 1000);
-      document.querySelectorAll(".fvm-timer").forEach((span) => {
-        const createdUtc = parseInt(span.dataset.created);
-        const expires = createdUtc + TWENTY_FOUR_HOURS_S;
-        const diff = expires - now;
 
-        if (diff <= 0) {
-          span.innerHTML = "ℹ️ Expired";
-          span.style.color = "#777";
-          span.classList.add("fvm-info-trigger");
-        } else {
-          const h = Math.floor(diff / 3600);
-          const m = Math.floor((diff % 3600) / 60);
-          span.textContent = h > 0 ? `(${h}h ${m}m)` : `(${m}m left)`;
-          span.style.color = h === 0 && m < 15 ? "#a00" : "#333";
-        }
+      document.querySelectorAll(".fvm-timer").forEach((span) => {
+        // Skip if already processed as expired
+        if (span.dataset.state === "expired") return;
+        this.updateTimerRow(span, now);
       });
+    },
+
+    updateTimerRow(span, now) {
+      const createdUtc = parseInt(span.dataset.created);
+      if (!Number.isFinite(createdUtc)) return;
+
+      const expires = createdUtc + TWENTY_FOUR_HOURS_S;
+      const diff = expires - now;
+
+      if (diff <= 0) {
+        // Mark timer expired
+        span.innerHTML = this.labels.timeExpired;
+        span.dataset.state = "expired";
+        span.classList.add("fvm-info-trigger");
+
+        const rowState = this.getRowState(span);
+
+        if (rowState === "entered") {
+          // User entered but raffle now expired
+          this.setLinkText(span, this.labels.doneCheck);
+          this.setRowLinkState(span, "expired");
+        } else {
+          this.setLinkText(span, this.labels.expired);
+          this.setRowLinkState(span, "missed");
+        }
+      } else {
+        const h = Math.floor(diff / 3600);
+        const m = Math.floor((diff % 3600) / 60);
+
+        span.textContent = this.getTimeLeftText(diff);
+        span.dataset.state = this.getTimeLeftState(h, m);
+      }
+    },
+
+    // finds the link for the current row and sets the anchor text
+    setLinkText(obj, txt) {
+      const row = obj.closest(".fvm-raffle-row");
+      if (!row) return;
+
+      const link = row.querySelector(".fvm-raffle-link");
+      if (!link) return;
+      link.textContent = txt;
+    },
+
+    getRowState(obj) {
+      const row = obj.closest(".fvm-raffle-row");
+      if (!row) "";
+
+      return row.dataset.state;
+    },
+
+    setRowLinkState(obj, state) {
+      console.log("setRowLinkState", state);
+      const row = obj.closest(".fvm-raffle-row");
+      if (!row) return;
+
+      row.dataset.state = state;
+
+      const link = row.querySelector(".fvm-raffle-link");
+      if (!link) return;
+
+      link.dataset.state = state;
+    },
+
+    getTimeLeftText(diff) {
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      return diff > 99 ? (h > 0 ? `${h}h ${m}m` : `${m}m`) : `${diff}s`;
+    },
+
+    getTimeLeftState(h, m) {
+      return h === 0 && m < 15 ? "expiring" : "ok";
     },
 
     // update the time left on a raffle every minute
     startGlobalTimer() {
       if (countdownTimer) clearInterval(countdownTimer);
-      countdownTimer = setInterval(() => this.updateTimers(), 60000); // Update every minute
+      countdownTimer = setInterval(() => this.updateTimers(), 15000); // Update every minute
     },
 
     async refreshPopup() {
@@ -462,6 +597,7 @@
     render(groupedData, gotItData) {
       const body = document.getElementById("fvm-body");
       const user = localStorage.getItem("fvm_user_id");
+      const now = Math.floor(Date.now() / 1000);
 
       if (!groupedData || Object.keys(groupedData).length === 0) {
         body.innerHTML = "No active raffles found.";
@@ -495,26 +631,27 @@
           `;
 
           raffles.forEach((raffle, index) => {
-            const now = Math.floor(Date.now() / 1000);
             const expires = parseInt(raffle.created_utc) + 86400;
             const isExpired = now > expires;
 
             const raffleId = raffle.id || raffle.post_id;
 
+            // database status is "", active, or done
+            // but done isn't sent returned
             const isEntered = raffle.status === "active";
-            let linkColor = isEntered ? FVM_Colours.orange : FVM_Colours.blue;
-            let label = isEntered ? "Entered" : "New Raffle";
-            let rowClass = isEntered ? "fvm_entered" : "fvm_new";
+
+            let label = isEntered ? this.labels.entered : this.labels.new;
+            let newState = isEntered ? "entered" : "new";
             let btn = "";
+            let timeLeft = "";
             if (isExpired) {
-              linkColor = FVM_Colours.blue;
-              rowClass = "fvm_expired";
+              timeLeft = this.labels.timeExpired;
+              newState = "expired";
               if (raffle.winner.length === 0) {
-                label = "Done, did you win?";
+                label = this.labels.doneCheck;
               } else {
                 if (raffle.winner === user) {
-                  label = "🎉 You won! Claim! 🎉";
-                  rowClass += " fvm_winner";
+                  label = this.labels.youwon;
                 } else {
                   label = `Winner: ${raffle.winner} `;
                   btn = `<button class="fvm-raffle-ok" data-postid="${raffleId}">
@@ -522,22 +659,27 @@
                   </button>`;
                 }
               }
+            } else {
+              const diff = expires - now;
+              timeLeft = this.getTimeLeftText(diff);
             }
 
-            html += `
-                <div id="fvm-${raffleId}" class="fvm-raffle-row ${rowClass}">
+            const newRow = `
+                <div id="fvm-${raffleId}" class="fvm-raffle-row" data-state=${newState}>
                   <a href="${raffle.url}" 
                     class="fvm-raffle-link" 
                     data-postid="${raffleId}" 
                     data-status="${raffle.status}"
                     data-winner="${raffle.winner}"
-                    data-isexpired="${isExpired}"
-                    style="color: ${linkColor};">
-                    • ${label}
+                    data-state="${newState}"
+                    >
+                    ${label}
                   </a>
                   ${btn}
-                  <span class="fvm-timer" data-created="${raffle.created_utc}" data-author="${raffle.author}" data-winner="${raffle.winner}" >...</span>
+                  <span class="fvm-timer ${isExpired ? "fvm-info-trigger" : ""}" data-state="${newState}" data-created="${raffle.created_utc}" data-author="${raffle.author}" data-winner="${raffle.winner}" >${timeLeft}</span>
                 </div>`;
+            if (raffleId === "t3_1r2ows8") console.log(newRow);
+            html += newRow;
           });
           html += `</div></div>`;
         }
@@ -575,9 +717,9 @@
 
         // 1. INFO MODAL TRIGGER
         if (target.classList.contains("fvm-info-trigger")) {
-          const author = target.getAttribute("data-author");
-          const winner = target.getAttribute("data-winner");
-          const created = parseInt(target.getAttribute("data-created"));
+          const author = target.dataset.author;
+          const winner = target.dataset.winner;
+          const created = parseInt(target.dataset.created);
           FVM_Modal.showInfo(author, winner, created);
           return;
         }
@@ -588,12 +730,26 @@
 
           e.preventDefault();
           e.stopPropagation();
-          const postId = target.getAttribute("data-postid");
-          const status = target.getAttribute("data-status");
-          const winner = target.getAttribute("data-winner");
-          const isExpired = target.getAttribute("data-isexpired") === "true";
+          const state = target.dataset.state;
+          const postId = target.dataset.postid;
+          const winner = target.dataset.winner;
+          const isExpired = target.dataset.state === "expired";
           const newStatus = isExpired ? "done" : "active";
-          if (status === newStatus) {
+          const newState = isExpired
+            ? state === "new"
+              ? "missed"
+              : "checked"
+            : "entered";
+          console.log(
+            "raffle click",
+            state,
+            postId,
+            winner,
+            isExpired,
+            newStatus,
+            newState,
+          );
+          if (state === newState || newState === "missed") {
             this.goToDestination(destination);
             return; // No change needed
           }
@@ -608,31 +764,14 @@
               "POST",
             );
 
-            target.style.color = FVM_Colours.orange; // Change color to indicate entered
+            target.dataset.state = newState; // Change color to indicate entered
             target.innerHTML = isExpired ? "✅ Checked" : "✅ Entered"; // Update label
 
-            // clear the classes that indicate new/expired if the user has already clicked on them
-            const row = target.closest(".fvm-raffle-row");
-            if (row) {
-              // 2. Remove the fvm_new class if it exists
-              if (row.classList.contains("fvm_new")) {
-                row.classList.remove("fvm_new");
-              }
-              if (row.classList.contains("fvm_expired")) {
-                row.classList.remove("fvm_expired");
-              }
-              // end of clearing classes
-            }
+            this.setRowLinkState(target, newState);
 
-            if (newStatus === "done" && winner.length === 0) {
+            if (newState === "checked" && winner.length === 0) {
               // because the save button looks at the current url the user can't save unless they're on the page
-              const bodyContainer = document.getElementById("fvm-body");
-              const existingBtn =
-                bodyContainer.querySelector(".fvm-save-winner");
-
-              if (existingBtn) {
-                existingBtn.remove();
-              }
+              this.clearWinnerSaveButtons();
 
               const saveBtn = document.createElement("span");
               saveBtn.className = "fvm-save-winner";
@@ -657,7 +796,7 @@
           const postId = target.getAttribute("data-postid");
 
           try {
-            // Replicating your old sendLinkStatus logic
+            // Replicating old sendLinkStatus logic
             await FVM_API.sendToServer(
               "link",
               {
@@ -668,8 +807,11 @@
               "POST",
             );
             target.textContent = "✅";
-            const row = target.closest(".fvm-raffle-row");
-            row.classList.remove("fvm_expired");
+            this.setRowLinkState(target, "checked");
+            // const row = target.closest(".fvm-raffle-row");
+            // row.dataset.state = "checked";
+            // const link = row.querySelector(".fvm-raffle-link");
+            // link.dataset.state = "checked";
           } catch (err) {
             console.error("Error updating raffle as done - ok button:", err);
           }
@@ -677,14 +819,32 @@
 
         if (target.classList.contains("fvm-save-winner")) {
           const postId = target.getAttribute("data-postid");
-          const winnerName = await FVM_Extractor.saveRaffleData(postId);
-          target.textContent = "Saved!";
-          target.classList.remove("fvm-save-winner");
 
-          const infoSpan =
-            target.parentElement.querySelector(".fvm-info-trigger");
-          if (infoSpan) {
-            infoSpan.setAttribute("data-winner", winnerName);
+          // 1. Start Loading State
+          target.style.pointerEvents = "none"; // Prevent double-clicks during lag
+          target.innerHTML = `${this.getSpinner()} Saving...</span>`;
+          //await new Promise(requestAnimationFrame);
+
+          try {
+            // 2. Perform the async save
+            const winnerName = await FVM_Extractor.saveRaffleData(postId);
+
+            // 3. Success State
+            target.textContent = "✅ Saved!";
+            target.classList.remove("fvm-save-winner");
+            target.style.pointerEvents = "auto"; // Re-enable (though class is removed)
+
+            const infoSpan =
+              target.parentElement.querySelector(".fvm-info-trigger");
+            if (infoSpan) {
+              infoSpan.setAttribute("data-winner", winnerName);
+            }
+            this.setRowLinkState(target, "checked");
+          } catch (error) {
+            // 4. Error Handling (Optional but recommended)
+            console.error("Save failed:", error);
+            target.textContent = "💾 Retry Save";
+            target.style.pointerEvents = "auto";
           }
           return;
         }
@@ -732,6 +892,16 @@
       };
     },
 
+    clearWinnerSaveButtons() {
+      const bodyContainer = document.getElementById("fvm-body");
+      //there should only be one
+      const existingBtn = bodyContainer.querySelector(".fvm-save-winner");
+
+      if (existingBtn) {
+        existingBtn.remove();
+      }
+    },
+
     goToDestination(destination) {
       const routerLink = document.createElement("a");
       routerLink.href = destination;
@@ -747,42 +917,14 @@
       }, 100);
     },
 
-    async renderPills(user) {
-      const container = document.getElementById("fvm-pills");
-      try {
-        const data = await FVM_API.sendToServer("gotits", { user }, "GET");
-        const list = Array.isArray(data)
-          ? data
-          : data
-            ? Object.values(data).flat()
-            : [];
-        if (list.length === 0) return;
-
-        container.innerHTML = `<div style="font-size:0.75em; color:#888;">Collected:</div>`;
-        list.forEach((kw) => {
-          const p = document.createElement("span");
-          p.className = "gotit-pill";
-          p.textContent = kw;
-          p.onclick = async () => {
-            //if (confirm(`Reactivate ${kw}?`)) {
-            await FVM_API.sendToServer(
-              "delete_keyword",
-              { user: user, keyword: kw },
-              "POST",
-            );
-            this.refreshPopup();
-            //}
-          };
-          container.appendChild(p);
-        });
-      } catch (e) {}
-    },
-
     findOldestNewRaffle() {
       let best = null;
 
       const popBody = document.getElementById("fvm-body");
-      const rows = popBody.querySelectorAll(".fvm-raffle-row.fvm_new");
+      //const rows = popBody.querySelectorAll(".fvm-raffle-row.fvm_new");
+      const rows = popBody.querySelectorAll(
+        '.fvm-raffle-row[data-state="new"]',
+      );
 
       for (const row of rows) {
         const timer = row.querySelector(".fvm-timer[data-created]");
@@ -803,12 +945,16 @@
       return best.link;
     },
 
-    jumpToRow(btnSelector, rowSelector) {
+    jumpToRow(btnSelector, state) {
+      const popBody = document.getElementById("fvm-body");
       let nextRow;
       if (btnSelector === "fvm-jump-oldest") {
         nextRow = this.findOldestNewRaffle();
       } else {
-        nextRow = document.querySelector(`.${rowSelector}`);
+        // nextRow = document.querySelector(`.${rowSelector}`);
+        nextRow = popBody.querySelector(
+          `.fvm-raffle-row[data-state="${state}"]`,
+        );
       }
 
       if (nextRow) {
@@ -876,6 +1022,24 @@
       }
 
       return "";
+    },
+    getSpinner() {
+      return `<svg width="12" height="12" viewBox="0 0 50 50" style="margin-right:4px;">
+        <circle cx="25" cy="25" r="20"
+          fill="none"
+          stroke="${FVM_Colours.darkOrange}"
+          stroke-width="5"
+          stroke-linecap="round"
+          stroke-dasharray="31.4 31.4">
+          <animateTransform
+            attributeName="transform"
+            type="rotate"
+            from="0 25 25"
+            to="360 25 25"
+            dur="0.8s"
+            repeatCount="indefinite" />
+        </circle>
+      </svg>`;
     },
   };
 
@@ -961,6 +1125,7 @@ Time since Raffle Closed: ${days}d ${hours}h ${minutes}m`;
   // --- 3. EXECUTION ---
   const init = () => {
     if (document.body) {
+      console.info("FVM Startup", FVM_SCRIPT_VERSION);
       FVM_UI.init();
       FVM_Importer.runInitialImport();
       FVM_Importer.runHourlyImport();
