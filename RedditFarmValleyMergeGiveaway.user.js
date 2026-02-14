@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.16
+// @version      3.17
 // @match        *://*.reddit.com/r/FarmMergeValley*
 // @match        *://*.reddit.com/r/ClubSusan*
 // @connect      reddit.com
@@ -39,6 +39,7 @@
     darkOrange: "#E2852E",
     blue: "#0079d3",
     yellow: "#fff3cd",
+    black: "#444444",
     gray: "#666666",
     coral: "#d14d28",
     red: "#c2410c",
@@ -394,7 +395,8 @@
         .fvm-gotits-container {display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; padding: 5px; background: #fafafa; border-radius: 4px;}
         #fvm-close {background:none; border:none; color: ${FVM_Colours.darkOrange}; cursor:pointer; font-size:18px;}
         #fvm-footer {padding: 10px; border-top: 1px solid #eee; display: flex; gap: 8px;align-items: center;}
-        #fvm-footer a, #fvm-footer span { background-color: transparent !important; line-height: 1; /* Prevents extra vertical space that can cause background bleeding */ display: inline-flex; align-items: center; mix-blend-mode: multiply; }        #fvm-star-level-header {margin: 10px 0 5px 0; font-weight: bold; color: #444; border-left: 4px solid ${FVM_Colours.darkOrange}; padding-left: 8px;}
+        #fvm-footer a, #fvm-footer span { background-color: transparent !important; line-height: 1; /* Prevents extra vertical space that can cause background bleeding */ display: inline-flex; align-items: center; mix-blend-mode: multiply; }
+        #fvm-star-level-header {margin: 10px 0 5px 0; font-weight: bold; color: #444; border-left: 4px solid ${FVM_Colours.darkOrange}; padding-left: 8px;}
         .fvm-raffle-container {margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; overflow: hidden;}
         .fvm-raffle-header {display:flex; justify-content:space-between; background:#f8f8f8; padding: 4px 10px; align-items: center; border-bottom: 1px solid #eee;}
         .fvm-timer {font-size: 0.85em; color: #666; font-family: monospace;}
@@ -412,12 +414,15 @@
 .fvm-timer[data-state="expired"]{color: ${FVM_Colours.gray};}
 .fvm-timer[data-state="expiring"]{color: ${FVM_Colours.red};}
 .fvm-timer[data-state="ok"]{color: ${FVM_Colours.blue};}
+.fvm-shadow-sm { box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .075) !important; }
+.fvm-shadow    { box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15) !important; }
+.fvm-shadow-lg { box-shadow: 0 1rem 3rem rgba(0, 0, 0, .175) !important; }
       `;
 
       document.head.appendChild(style);
     },
     labels: {
-      youwon: "🎉 You won! Claim! 🎉",
+      youWon: "🎉 You won! Claim! 🎉",
       expired: "• Expired Raffle",
       doneCheck: "• Done, did you win?",
       entered: "• Entered",
@@ -622,7 +627,7 @@
           if (!Array.isArray(raffles)) raffles = [raffles];
 
           html += `
-            <div class="fvm-raffle-container" >
+            <div class="fvm-raffle-container fvm-shadow-sm" >
               <div class="fvm-raffle-header" >
                 <strong style="color:${FVM_Colours.darkOrange}; font-size: 0.8em;">${stickerName.toUpperCase()} ${starCount}</strong>
                 <button class="got-it-btn" data-keyword="${stickerName}" >Got It!</button>
@@ -651,7 +656,7 @@
                 label = this.labels.doneCheck;
               } else {
                 if (raffle.winner === user) {
-                  label = this.labels.youwon;
+                  label = this.labels.youWon;
                 } else {
                   label = `Winner: ${raffle.winner} `;
                   btn = `<button class="fvm-raffle-ok" data-postid="${raffleId}">
@@ -739,7 +744,9 @@
             ? state === "new"
               ? "missed"
               : "checked"
-            : "entered";
+            : state === "checked"
+              ? "checked"
+              : "entered";
           console.log(
             "raffle click",
             state,
