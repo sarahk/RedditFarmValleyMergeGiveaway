@@ -1,6 +1,8 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.18
+// @version      3.19
+// @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
+// @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
 // @match        *://*.reddit.com/r/ClubSusan*
 // @connect      reddit.com
