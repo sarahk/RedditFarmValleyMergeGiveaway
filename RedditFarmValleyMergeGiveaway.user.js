@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.17
+// @version      3.18
 // @match        *://*.reddit.com/r/FarmMergeValley*
 // @match        *://*.reddit.com/r/ClubSusan*
 // @connect      reddit.com
@@ -17,7 +17,8 @@
   ("use strict");
 
   const TWENTY_FOUR_HOURS_S = 86400;
-  let countdownTimer = null;
+  let slowTimer = null;
+  let fastTimer = null;
 
   const FVM_Emojis = {
     trophy: "🏆",
@@ -327,50 +328,6 @@
       this.drawPopup();
       this.refreshPopup();
       this.startGlobalTimer();
-      //this.setupObserver();
-    },
-
-    setupObserver() {
-      const targetNode = document.getElementById("fvm-body");
-      if (!targetNode) return;
-
-      // const observer = new MutationObserver((mutations) => {
-      //   mutations.forEach((mutation) => {
-      //     mutation.addedNodes.forEach((node) => {
-      //       // Check if any newly added nodes are (or contain) our links
-      //       if (node.nodeType === 1) {
-      //         const links = node.classList?.contains("fvm-raffle-link")
-      //           ? [node]
-      //           : node.querySelectorAll(".fvm-raffle-link");
-
-      //         // This forces a re-paint check by the browser
-      //         // which ensures your [data-state] CSS kicks in
-      //         links.forEach((link) => {
-      //           if (link.dataset.state) {
-      //             // Refresh the attribute to trigger the CSS engine
-      //             const currentState = link.dataset.state;
-      //             link.setAttribute("data-state", currentState);
-      //           }
-      //         });
-      //       }
-      //     });
-      //   });
-      // });
-      const observer = new MutationObserver((mutations) => {
-        // This only fires when the content INSIDE #fvm-body changes
-        mutations.forEach((mutation) => {
-          if (mutation.addedNodes.length) {
-            // Since we are already inside the popup, we can just
-            // let the CSS engine handle it, or force a class check here.
-            console.log("FVM: Popup content updated, styles refreshed.");
-          }
-        });
-      });
-
-      observer.observe(targetNode, {
-        childList: true,
-        subtree: true,
-      });
     },
 
     injectStyles() {
@@ -475,30 +432,59 @@
         this.jumpToRow("fvm-jump-oldest", "new");
     },
 
-    // New helper to update timer text live
-    updateTimers() {
-      const now = Math.floor(Date.now() / 1000);
+    getSecondsRemaining(createdUtc) {
+      const expirationTime = createdUtc + TWENTY_FOUR_HOURS_S;
+      const currentTime = Math.floor(Date.now() / 1000);
 
-      document.querySelectorAll(".fvm-timer").forEach((span) => {
-        // Skip if already processed as expired
-        if (span.dataset.state === "expired") return;
-        this.updateTimerRow(span, now);
-      });
+      const seconds = expirationTime - currentTime;
+
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+
+      let str = "Expired";
+      if (seconds > 0) str = this.getTimeLeftText(hours, minutes, seconds);
+
+      const state =
+        seconds < 0
+          ? "expired"
+          : hours === 0 && minutes <= 15
+            ? "expiring"
+            : "ok";
+
+      return {
+        state: state,
+        seconds: seconds,
+        minutes: minutes,
+        hours: hours,
+        text: str,
+      };
+    },
+
+    getTimeLeftText(h, m, seconds) {
+      return seconds > 99 ? (h > 0 ? `${h}h ${m}m` : `${m}m`) : `${seconds}s`;
+    },
+
+    // New helper to update timer text live
+    updateTimers(state) {
+      document
+        .querySelectorAll(`.fvm-timer[data-state="${state}"]`)
+        .forEach((span) => {
+          this.updateTimerRow(span);
+        });
     },
 
     updateTimerRow(span, now) {
       const createdUtc = parseInt(span.dataset.created);
       if (!Number.isFinite(createdUtc)) return;
+      const timeRemaining = this.getSecondsRemaining(createdUtc);
 
-      const expires = createdUtc + TWENTY_FOUR_HOURS_S;
-      const diff = expires - now;
+      span.dataset.state = timeRemaining.state;
+      span.textContent = timeRemaining.text;
 
-      if (diff <= 0) {
+      if (timeRemaining.state === "expired") {
         // Mark timer expired
-        span.innerHTML = this.labels.timeExpired;
-        span.dataset.state = "expired";
-        span.classList.add("fvm-info-trigger");
 
+        span.classList.add("fvm-info-trigger");
         const rowState = this.getRowState(span);
 
         if (rowState === "entered") {
@@ -509,12 +495,6 @@
           this.setLinkText(span, this.labels.expired);
           this.setRowLinkState(span, "missed");
         }
-      } else {
-        const h = Math.floor(diff / 3600);
-        const m = Math.floor((diff % 3600) / 60);
-
-        span.textContent = this.getTimeLeftText(diff);
-        span.dataset.state = this.getTimeLeftState(h, m);
       }
     },
 
@@ -548,20 +528,16 @@
       link.dataset.state = state;
     },
 
-    getTimeLeftText(diff) {
-      const h = Math.floor(diff / 3600);
-      const m = Math.floor((diff % 3600) / 60);
-      return diff > 99 ? (h > 0 ? `${h}h ${m}m` : `${m}m`) : `${diff}s`;
-    },
-
     getTimeLeftState(h, m) {
       return h === 0 && m < 15 ? "expiring" : "ok";
     },
 
     // update the time left on a raffle every minute
     startGlobalTimer() {
-      if (countdownTimer) clearInterval(countdownTimer);
-      countdownTimer = setInterval(() => this.updateTimers(), 15000); // Update every minute
+      if (slowTimer) clearInterval(slowTimer);
+      slowTimer = setInterval(() => this.updateTimers("ok"), 60000); // Update every minute
+      if (fastTimer) clearInterval(fastTimer);
+      fastTimer = setInterval(() => this.updateTimers("expiring"), 10000); // Update every 10 seconds
     },
 
     async refreshPopup() {
@@ -637,20 +613,23 @@
 
           raffles.forEach((raffle, index) => {
             const expires = parseInt(raffle.created_utc) + 86400;
+            const timeRemaining = this.getSecondsRemaining(
+              parseInt(raffle.created_utc),
+            );
+
             const isExpired = now > expires;
 
             const raffleId = raffle.id || raffle.post_id;
 
             // database status is "", active, or done
-            // but done isn't sent returned
+            // but done isn't sent
             const isEntered = raffle.status === "active";
 
             let label = isEntered ? this.labels.entered : this.labels.new;
             let newState = isEntered ? "entered" : "new";
             let btn = "";
-            let timeLeft = "";
-            if (isExpired) {
-              timeLeft = this.labels.timeExpired;
+
+            if (timeRemaining.state === "expired") {
               newState = "expired";
               if (raffle.winner.length === 0) {
                 label = this.labels.doneCheck;
@@ -664,9 +643,6 @@
                   </button>`;
                 }
               }
-            } else {
-              const diff = expires - now;
-              timeLeft = this.getTimeLeftText(diff);
             }
 
             const newRow = `
@@ -681,7 +657,7 @@
                     ${label}
                   </a>
                   ${btn}
-                  <span class="fvm-timer ${isExpired ? "fvm-info-trigger" : ""}" data-state="${newState}" data-created="${raffle.created_utc}" data-author="${raffle.author}" data-winner="${raffle.winner}" >${timeLeft}</span>
+                  <span class="fvm-timer ${isExpired ? "fvm-info-trigger" : ""}" data-state="${timeRemaining.state}" data-created="${raffle.created_utc}" data-author="${raffle.author}" data-winner="${raffle.winner}" >${timeRemaining.text}</span>
                 </div>`;
             if (raffleId === "t3_1r2ows8") console.log(newRow);
             html += newRow;
