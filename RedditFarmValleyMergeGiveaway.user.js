@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.19
+// @version      3.20
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -35,6 +35,7 @@
     top: "🔝",
     zap: "⚡",
     hourglass: "⌛",
+    redflag: "🚩",
   };
 
   const FVM_Colours = {
@@ -443,7 +444,7 @@
       const hours = Math.floor(seconds / 3600);
       const minutes = Math.floor((seconds % 3600) / 60);
 
-      let str = "Expired";
+      let str = this.labels.timeExpired;
       if (seconds > 0) str = this.getTimeLeftText(hours, minutes, seconds);
 
       const state =
