@@ -5,12 +5,37 @@
 
 Adds a popup to Reddit to show new giveaways for the game Farm Valley Merge and lets the user exclude giveaways that aren't needed.
 
-Features:
+**Features:**
 
-* Shows raffles that are new, entered, finished and won.
-* Buttons at the top of the popup to speedily scroll to the first finished or new raffle
-* Clear items by clicking "Got It" when you have a sticker and no longer want to enter those raffles - raffles already entered will stay visible
-* Expired raffles may show who the winner is, so you don't have to click the link and then "reveal". Raffles you have won are highlighted. If nobody has checked that raffle yet, after you've clicked "reveal" on the game, click "save" on the popup to save other users from needing to check.
+**Smart Tracking:** Automatically categorizes raffles as New, Entered, Finished, or Won.
+
+**Quick Navigation:** Navigation shortcuts at the top of the popup to jump instantly to the oldest new raffle or the most recent expired one.
+
+**Collection Management:** Use the "Got It" button to hide stickers you no longer need. These are kept in a "Collected" area where they can be reactivated with a single click.
+
+**Crowdsourced Winner Data:** If a raffle is expired, the script checks if a winner has been recorded. If not, clicking "Save" on the raffle page extracts the winner data and shares it with all other users.
+
+**Detailed Analytics:** An info modal shows the raffle author, the winner, and exactly how many days/hours/minutes have passed since the raffle closed.
+
+**Integrated Copy Tools:** Quickly copy usernames to your clipboard to facilitate prize claims or communication.
+
+**How Farm Merge Valley raffles work**
+
+* a user earns a sticker by playing the game, if they already have the sticker they may be prompted to raffle the duplicate and earn bonus star vault points. The raffle will run for 24 hours and the user won't be prompted to start another until this one ends.
+* To enter a raffle users must search for raffles that are less than 24 hours old, open the post and click enter. The game needs to fully load for the entry to be valid.
+* At the end of the raffle the user must return to the raffle to "reveal" the winner. The next time they open the game the sticker will be awarded to them. You have a limited period of time (7 days?) to check a raffle and claim your sticker.
+
+**How this script helps**
+
+* faster to find open raffles for the stickers you need
+* easy to exclude raffles for stickers you already have, or are happy to earn through the game (eg 1 star stickers)
+* no need to record which raffles you have entered, the popup will take you back to them
+* no need to visit a raffle you've entered if the winner has been recorded by another player and someone else won.
+
+**What it doesn't do**
+
+* it doesn't actually enter you into the raffle, you still need to click enter.
+* it doesn't claim your sticker, you still need to click reveal.
 
 **Installation**
 
