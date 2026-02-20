@@ -1,7 +1,7 @@
 
 # RedditFarmValleyMergeGiveaway
 
-<img width="300" alt="image" src="https://github.com/user-attachments/assets/76d25657-8cfc-48d9-abc0-1c42037920f8" />
+<img width="312" height="300" alt="image" src="https://github.com/user-attachments/assets/adf4a5ab-588f-4410-b712-571c108d731f" />
 
 Adds a popup to Reddit to show new giveaways for the game Farm Valley Merge and lets the user exclude giveaways that aren't needed.
 
@@ -61,3 +61,17 @@ This script is still experimental. Let me know if anything breaks or if you have
 Some users report having trouble saving their username. If you are having problems please get in touch - there's a chat button at the bottom of the popup. Old Reddit and New Reddit will both ask you for your username, this is normal behaviour that I can't get around. New Reddit is the login name that matters.
 
 **Firefox** - a few known issues that I haven't had time to resolve. Chrome, Safari, and Brave behave normally.
+
+**TamperMonkey/GreaseMonkey and Developer Mode**
+
+TM/GM require that your browser has developer mode turned on for ALL extensions. That should be fine for most browser extensions but may open you up to security risks. 
+
+<img width="436" height="232" alt="image" src="https://github.com/user-attachments/assets/df4f4607-eb98-42f5-8c6e-4fdc9a906e43" />
+
+If you find you still get a warning message about needing to turn developer mode on open up TM/GM from the browser extension list. There will be a bunch of options and settings. Check these two.
+
+<img width="640" height="171" alt="image" src="https://github.com/user-attachments/assets/ddb308c7-99bf-4010-bd41-d609d78798d1" />
+
+If you're still having problems please let me know.
+
+
