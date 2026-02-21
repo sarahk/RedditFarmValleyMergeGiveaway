@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.21
+// @version      3.22
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -113,12 +113,19 @@
       let url = this.target;
       let body = null;
       let headers = { "X-Api-Key": this.key };
+      const username = localStorage.getItem("fvm_user_id");
 
       if (isGet) {
-        url += `?what=${action}&${new URLSearchParams(data).toString()}`;
+        url += `?what=${action}&username=${username}&${new URLSearchParams(data).toString()}`;
       } else {
         headers["Content-Type"] = "application/x-www-form-urlencoded";
-        body = new URLSearchParams({ what: action, ...data }).toString();
+        //body = new URLSearchParams({ what: action, ...data }).toString();
+
+        body = new URLSearchParams({
+          what: action,
+          username: username, // Adds the ID
+          ...data,
+        }).toString();
       }
       //console.log(["FVM_API.sendToServer:", method, url]);
       //console.log(["FVM_API.sendToServer:", body]);
@@ -638,13 +645,18 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         // 1. Loop through RAFFLES for this star level
         for (const stickerName in stickersInLevel) {
           let raffles = stickersInLevel[stickerName];
+          const safeStickerName = stickerName.replace(/[^a-zA-Z0-9\-_.]/g, "");
           if (!Array.isArray(raffles)) raffles = [raffles];
 
+          const gotItBtn = gotItData?.[starLevel]?.includes(stickerName)
+            ? ""
+            : `<button class="got-it-btn" data-keyword="${stickerName}" >Got It!</button>`;
+
           html += `
-            <div class="fvm-raffle-container fvm-shadow-sm" >
+            <div class="fvm-raffle-container fvm-shadow-sm" id="fvm-sticker-${safeStickerName}">
               <div class="fvm-raffle-header" >
                 <strong style="color:${FVM_Colours.darkOrange}; font-size: 0.8em;">${stickerName.toUpperCase()} ${starCount}</strong>
-                <button class="got-it-btn" data-keyword="${stickerName}" >Got It!</button>
+                ${gotItBtn}
               </div>
               <div style="padding: 2px 8px;">
           `;
@@ -898,7 +910,17 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
               { user: user, keyword: keyword },
               "POST",
             );
-            this.refreshPopup(); // Reload UI to move sticker to pills
+            //this.refreshPopup(); // Reload UI to move sticker to pills
+            const safeKeyword = keyword.replace(/[^a-zA-Z0-9\-_.]/g, "");
+            console.log("Marking as Got It:", keyword, safeKeyword);
+            const container = body.querySelector(`#fvm-sticker-${safeKeyword}`);
+            const newRaffles = container.querySelectorAll(
+              ".fvm-raffle-row[data-state='new']",
+            );
+            newRaffles.forEach((row) => {
+              row.remove();
+            });
+            target.remove(); // Remove the Got It button immediately for better UX
           } catch (err) {
             console.error("Error saving 'Got It':", err);
           }
