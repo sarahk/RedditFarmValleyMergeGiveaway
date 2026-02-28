@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.22
+// @version      3.24
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -760,6 +760,36 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       return;
     },
 
+    catchRaffleResult() {
+      const script = document.createElement("script");
+      script.textContent = `
+        (function() {
+            const originalFetch = window.fetch;
+            window.fetch = async (...args) => {
+                const url = args[0] instanceof Request ? args[0].url : args[0];
+                if (url.includes("/api/posts/getRaffleData")) {
+                    console.info("[FVM] Intercepted fetch to:", url);
+                    const response = await originalFetch(...args);
+                    const clone = response.clone();
+                    clone.json().then(data => {
+                        // Dispatch a custom event so your main userscript can see the data
+                        window.dispatchEvent(new CustomEvent('FVM_DATA_RECEIVED', { detail: data }));
+                    });
+                    return response;
+                }
+                return originalFetch(...args);
+            };
+        })();
+    `;
+      (document.head || document.documentElement).appendChild(script);
+
+      // Listen for the event in your main userscript context
+      window.addEventListener("FVM_DATA_RECEIVED", (e) => {
+        console.log("[FVM] Data received from injected script:", e.detail);
+        // Do your GM_xmlhttpRequest here
+      });
+    },
+
     attachEvents(user) {
       const body = document.getElementById("fvm-body");
       body.onclick = null;
@@ -796,6 +826,9 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
             newStatus,
             newState,
           );
+          // if (isExpired) {
+          //   this.catchRaffleResult();
+          // }
           if (state === newState || newState === "missed") {
             this.goToDestination(destination);
             return; // No change needed
@@ -1184,17 +1217,30 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         </div>`;
       }
       // todo once we have more than just a "deleted" flag we can expand this section to show more details about the flags, but for now we'll just show the count and let users click through to see which ones they are
-      const count = info.flags
-        ? info.flags.split(",").filter(Boolean).length
-        : 0;
+      // const count = info.flags
+      //   ? info.flags.split(",").filter(Boolean).length
+      //   : 0;
+      const flagsString = info.flags || "";
+      const flagsArray = flagsString.split(",").filter(Boolean);
+
+      // Initialize an object to store the counts
+      const flagCounts = flagsArray.reduce((acc, flag) => {
+        const cleanFlag = flag.trim().toLowerCase();
+        acc[cleanFlag] = (acc[cleanFlag] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Example Result: { deleted: 1, incorrect: 2 }
+      console.log(flagCounts);
 
       text += `<div class="fvm-modal-line">
-            <span>Flags: <strong>${count}</strong></span>
+            <span>Flags: Deleted: <strong>${flagCounts.deleted || 0}</strong>, Incorrect: <strong>${flagCounts.incorrect || 0}</strong></span>
         </div>`;
 
       text += `<div class="fvm-modal-line">
-            <span>Flag As: <button id='fvm-flag-deleted' ${rowState === "new" ? "disabled" : ""} style="padding:0 10px;border:1px solid ${FVM_Colours.silverDark};cursor:pointer;" data-postid=${info.postid} data-author="${info.author}">Deleted</button></span>
-        </div>`;
+            <span>Flag As: <button id='fvm-flag-deleted' data-role="flagproblems" ${rowState === "new" ? "disabled" : ""} style="padding:0 10px;border:1px solid ${FVM_Colours.silverDark};cursor:pointer;" data-postid=${info.postid} data-author="${info.author}" data-flag="deleted">Deleted</button></span>
+            <span> or <button id='fvm-flag-incorrect' data-role="flagproblems" ${rowState === "new" ? "disabled" : ""} style="padding:0 10px;border:1px solid ${FVM_Colours.silverDark};cursor:pointer;" data-postid=${info.postid} data-author="${info.author}" data-flag="incorrect">Incorrect</button></span>
+           </div>`;
 
       overlay.innerHTML = `
           <div class="fvm_modal" style="font-family:'Courier New', Courier, monospace">
@@ -1221,18 +1267,19 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       });
 
       // Prevent inside clicks from bubbling to overlay
-      overlay
-        .querySelector("#fvm-flag-deleted")
-        .addEventListener("click", async (e) => {
+      overlay.querySelectorAll("[data-role='flagproblems']").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          console.log("[FVM] Modal click:", e.target);
           e.stopPropagation();
 
           const postId = e.target.getAttribute("data-postid");
           const user = localStorage.getItem("fvm_user_id");
 
           //await new Promise(requestAnimationFrame);
+          const flagType = e.target.getAttribute("data-flag");
 
           if (
-            confirm("Are you sure you want to flag this raffle as deleted?")
+            confirm(`Are you sure you want to flag this raffle as ${flagType}?`)
           ) {
             try {
               e.target.disabled = true; // Stays disabled for this iteration of the modal.
@@ -1240,6 +1287,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
               await FVM_API.sendToServer("flag_deleted", {
                 postid: postId,
                 user: user,
+                flag: flagType,
               });
               // 3. Success State
               e.target.textContent = "✅ Flagged!";
@@ -1258,6 +1306,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
             }
           }
         });
+      });
 
       // 4. Listeners
       overlay.querySelector("#fvmCloseModal").onclick = () => overlay.remove();
@@ -1288,6 +1337,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       FVM_UI.init();
       FVM_Importer.runInitialImport();
       FVM_Importer.runHourlyImport();
+      //FVM_UI.catchRaffleResult();
     } else setTimeout(init, 200);
   };
   if (document.readyState === "complete") {
