@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.24
+// @version      3.25
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -12,7 +12,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @grant        GM_info
-// @run-at       document-idle
+// @run-at       document-start
 // ==/UserScript==
 
 (function () {
@@ -281,6 +281,7 @@
               participants: raffleData.participantIds
                 ? raffleData.participantIds.length
                 : 0,
+              owner: raffleData.owner.name,
             },
             "POST",
           );
@@ -710,7 +711,16 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
                   ${btn}
                   <div>
                     <span class="fvm-timer" data-state="${timeRemaining.state}" data-created="${raffle.created_utc}" >${timeRemaining.text}</span>
-                    <span class="pl-5" data-state="${flags.length > 0 ? "flagged" : "ok"}" data-role="info-trigger" data-postid="${raffleId}" data-created="${raffle.created_utc}" data-winner="${raffle.winner}" data-author="${raffle.author}" data-flags="${flags}" data-entrydate="${raffle.entry_date_utc}">${this.info_svg}</span>
+                    <span class="pl-5" data-state="${flags.length > 0 || raffle.harvester > 2 ? "flagged" : "ok"}" 
+                        data-role="info-trigger"
+                        data-postid="${raffleId}" 
+                        data-created="${raffle.created_utc}" 
+                        data-winner="${raffle.winner}" 
+                        data-winner_by="${raffle.winner_by || ""}"
+                        data-author="${raffle.author}" 
+                        data-flags="${flags}" 
+                        data-entrydate="${raffle.entry_date_utc}" 
+                        data-harvester="${raffle.harvester}">${this.info_svg}</span>
                   </div>
                 </div>`;
             if (raffleId === "t3_1r2ows8") console.log(newRow);
@@ -751,42 +761,61 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       const info = {
         author: target.dataset.author,
         winner: target.dataset.winner,
+        winner_by: target.dataset.winner_by || "",
         created: parseInt(target.dataset.created),
         entryDate: parseInt(target.dataset.entrydate),
         postid: target.dataset.postid,
         flags: target.dataset.flags || "",
+        harvester: parseInt(target.dataset.harvester || 0),
       };
+      console.log("Info Button Clicked:", info);
       FVM_Modal.showInfo(info, target);
       return;
     },
 
-    catchRaffleResult() {
-      const script = document.createElement("script");
-      script.textContent = `
-        (function() {
-            const originalFetch = window.fetch;
-            window.fetch = async (...args) => {
-                const url = args[0] instanceof Request ? args[0].url : args[0];
-                if (url.includes("/api/posts/getRaffleData")) {
-                    console.info("[FVM] Intercepted fetch to:", url);
-                    const response = await originalFetch(...args);
-                    const clone = response.clone();
-                    clone.json().then(data => {
-                        // Dispatch a custom event so your main userscript can see the data
-                        window.dispatchEvent(new CustomEvent('FVM_DATA_RECEIVED', { detail: data }));
-                    });
-                    return response;
-                }
-                return originalFetch(...args);
-            };
-        })();
-    `;
-      (document.head || document.documentElement).appendChild(script);
+    injectInterceptor() {
+      // Use unsafeWindow if available to reach the 'Main World'
+      const win = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
 
-      // Listen for the event in your main userscript context
-      window.addEventListener("FVM_DATA_RECEIVED", (e) => {
-        console.log("[FVM] Data received from injected script:", e.detail);
-        // Do your GM_xmlhttpRequest here
+      // Prevent double-injection
+      if (win.fvm_interceptor_loaded) return;
+      win.fvm_interceptor_loaded = true;
+
+      const originalFetch = win.fetch;
+
+      win.fetch = async (...args) => {
+        const url = args[0] instanceof Request ? args[0].url : args[0];
+
+        // Only log if it's our target to avoid console noise
+        if (url.includes("/api/posts/getRaffleData")) {
+          console.info("[FVM] Intercepting Raffle API...");
+
+          const response = await originalFetch(...args);
+          const clone = response.clone();
+
+          clone
+            .json()
+            .then((data) => {
+              console.log("[FVM] Data Caught:", data);
+              // Pass data back to the userscript context
+              window.dispatchEvent(
+                new CustomEvent("FVM_API_DATA", { detail: data }),
+              );
+            })
+            .catch((err) => console.error("[FVM] JSON Parse Error:", err));
+
+          return response;
+        }
+
+        return originalFetch(...args);
+      };
+      console.info("[FVM] Global Fetch Wrapper Active");
+
+      // Listener for your GM_xmlhttpRequest logic
+      window.addEventListener("FVM_API_DATA", (event) => {
+        const data = event.detail;
+        console.log("[FVM Sandbox] Processing synced data:", data);
+        // Your logic for api_stats.php goes here
       });
     },
 
@@ -1233,6 +1262,19 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       // Example Result: { deleted: 1, incorrect: 2 }
       console.log(flagCounts);
 
+      const getHarvesterText = (info) => {
+        if (info.harvester === 0) return "Unknown status";
+        if (info.harvester === 1) {
+          if (info.winner_by === "harvester") return "Success";
+          else return "Not visited";
+        }
+        if (info.harvester === 2) return "Error during harvest";
+        if (info.harvester === 3) return "Deleted by User";
+        if (info.harvester === 4) return "Deleted by Reddit";
+        if (info.harvester === 5) return "Network Error during harvest";
+        return "Unknown status";
+      };
+
       text += `<div class="fvm-modal-line">
             <span>Flags: Deleted: <strong>${flagCounts.deleted || 0}</strong>, Incorrect: <strong>${flagCounts.incorrect || 0}</strong></span>
         </div>`;
@@ -1241,6 +1283,12 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
             <span>Flag As: <button id='fvm-flag-deleted' data-role="flagproblems" ${rowState === "new" ? "disabled" : ""} style="padding:0 10px;border:1px solid ${FVM_Colours.silverDark};cursor:pointer;" data-postid=${info.postid} data-author="${info.author}" data-flag="deleted">Deleted</button></span>
             <span> or <button id='fvm-flag-incorrect' data-role="flagproblems" ${rowState === "new" ? "disabled" : ""} style="padding:0 10px;border:1px solid ${FVM_Colours.silverDark};cursor:pointer;" data-postid=${info.postid} data-author="${info.author}" data-flag="incorrect">Incorrect</button></span>
            </div>`;
+
+      if (timeRemaining.state === "expired") {
+        text += `<div class="fvm-modal-line">
+            <span>Harvest: <strong>${getHarvesterText(info)}</strong></span>
+        </div>`;
+      }
 
       overlay.innerHTML = `
           <div class="fvm_modal" style="font-family:'Courier New', Courier, monospace">
@@ -1334,10 +1382,10 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
   const init = () => {
     if (document.body) {
       console.info("FVM Startup", FVM_SCRIPT_VERSION);
+      FVM_UI.injectInterceptor();
       FVM_UI.init();
       FVM_Importer.runInitialImport();
       FVM_Importer.runHourlyImport();
-      //FVM_UI.catchRaffleResult();
     } else setTimeout(init, 200);
   };
   if (document.readyState === "complete") {
