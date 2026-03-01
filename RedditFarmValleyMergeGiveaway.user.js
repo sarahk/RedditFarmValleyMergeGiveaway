@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.25
+// @version      3.26
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -180,6 +180,91 @@
           console.error("Hourly task failed", e);
         }
       }
+    },
+
+    // Add inside FVM_Importer object
+    runStaleWinnerCheck() {
+      setInterval(async () => {
+        const now = Math.floor(Date.now() / 1000);
+        // Find all timer elements that are expired by more than 120s and not yet "checked"
+        const staleTimers = document.querySelectorAll(
+          '.fvm-timer[data-state="expired"][data-checked="false"]',
+        );
+
+        for (const el of staleTimers) {
+          const created = parseInt(el.dataset.created);
+
+          const rowState = FVM_UI.getRowState(el);
+
+          if (rowState === "missed") {
+            el.dataset.checked = "true"; // Mark as checked to avoid future processing
+            continue;
+          }
+
+          // Check if expired exactly or more than 120 seconds ago
+          const timeSinceExpiry = now - created - TWENTY_FOUR_HOURS_S;
+          console.log(
+            `Checking stale raffle: postId=${el.dataset.postid}, timeSinceExpiry=${timeSinceExpiry}s`,
+          );
+          if (timeSinceExpiry >= 180) {
+            console.log(
+              `Raffle expired over 3 minutes ago, checking for winner...`,
+              el.dataset,
+            );
+
+            const postId = el.dataset.postid;
+            if (!postId) continue;
+
+            try {
+              // Fetch fresh info for this specific post
+              const info = await FVM_API.sendToServer(
+                "post",
+                { post_id: postId },
+                "GET",
+              );
+
+              if (info && info.winner && info.winner !== "") {
+                console.log(`Winner found for ${postId} on stale check:`, info);
+                // Mark as checked so we don't fetch again
+                el.dataset.checked = "true";
+
+                // Find the parent cell to update the display
+                const youWon =
+                  info.winner === localStorage.getItem("fvm_user_id");
+                FVM_UI.setLinkText(
+                  el,
+                  youWon ? FVM_UI.labels.youWon : `Winner: ${info.winner}`,
+                );
+
+                if (!youWon) {
+                  const row = el.closest(".fvm-raffle-row");
+                  const link = row?.querySelector(".fvm-raffle-link");
+                  btn = `<button class="fvm-raffle-ok" data-postid="${postId}">
+                    OK
+                  </button>`;
+                  link.insertAdjacentHTML("afterend", btn);
+                }
+
+                // todo: change the modal to call the post info API rather than loading up the dataset.
+              } else {
+                if (info && info.harvester > 1) {
+                  //there's a problem, it's not going to be retested, so mark it as checked to avoid wasting time.
+                  el.dataset.checked = "true";
+                  console.log(
+                    `[FVM] Harvest failed for ${postId}, no further retries.`,
+                  );
+                } else {
+                  console.log(
+                    `[FVM] No winner yet for ${postId}, will retry next cycle.`,
+                  );
+                }
+              }
+            } catch (err) {
+              console.error(`[FVM] Stale check failed for ${postId}:`, err);
+            }
+          }
+        }
+      }, 15000); // Run every 15 seconds
     },
 
     async getJsonAndSend(redditUrl) {
@@ -710,7 +795,11 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
                   </a>
                   ${btn}
                   <div>
-                    <span class="fvm-timer" data-state="${timeRemaining.state}" data-created="${raffle.created_utc}" >${timeRemaining.text}</span>
+                    <span class="fvm-timer"
+                        data-postid="${raffleId}" 
+                        data-state="${timeRemaining.state}" 
+                        data-created="${raffle.created_utc}"
+                        data-checked="${raffle.winner > "" ? "true" : "false"}">${timeRemaining.text}</span>
                     <span class="pl-5" data-state="${flags.length > 0 || raffle.harvester > 2 ? "flagged" : "ok"}" 
                         data-role="info-trigger"
                         data-postid="${raffleId}" 
@@ -1268,10 +1357,14 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
           if (info.winner_by === "harvester") return "Success";
           else return "Not visited";
         }
-        if (info.harvester === 2) return "Error during harvest";
-        if (info.harvester === 3) return "Deleted by User";
-        if (info.harvester === 4) return "Deleted by Reddit";
-        if (info.harvester === 5) return "Network Error during harvest";
+
+        if (info.harvester === 2) return "Deleted by User";
+        if (info.harvester === 3) return "Deleted by Reddit";
+        if (info.harvester === 4) return "No token found";
+        if (info.harvester === 5) return "Network Error";
+        if (info.harvester === 6) return "Request timeout";
+        if (info.harvester === 7) return "No winner found";
+
         return "Unknown status";
       };
 
@@ -1320,12 +1413,16 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
           console.log("[FVM] Modal click:", e.target);
           e.stopPropagation();
 
-          const postId = e.target.getAttribute("data-postid");
+          const postId = e.target.dataset.postid;
           const user = localStorage.getItem("fvm_user_id");
 
           //await new Promise(requestAnimationFrame);
-          const flagType = e.target.getAttribute("data-flag");
-
+          const flagType = e.target.dataset.flag;
+          console.log("Flagging post", {
+            postid: postId,
+            user: user,
+            flag: flagType,
+          });
           if (
             confirm(`Are you sure you want to flag this raffle as ${flagType}?`)
           ) {
@@ -1386,6 +1483,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       FVM_UI.init();
       FVM_Importer.runInitialImport();
       FVM_Importer.runHourlyImport();
+      FVM_Importer.runStaleWinnerCheck();
     } else setTimeout(init, 200);
   };
   if (document.readyState === "complete") {
