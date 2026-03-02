@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.26
+// @version      3.27
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -206,9 +206,9 @@
           console.log(
             `Checking stale raffle: postId=${el.dataset.postid}, timeSinceExpiry=${timeSinceExpiry}s`,
           );
-          if (timeSinceExpiry >= 180) {
+          if (timeSinceExpiry >= 130) {
             console.log(
-              `Raffle expired over 3 minutes ago, checking for winner...`,
+              `Raffle expired over 2 minutes ago, checking for winner...`,
               el.dataset,
             );
 
@@ -237,17 +237,23 @@
                 );
 
                 if (!youWon) {
-                  const row = el.closest(".fvm-raffle-row");
+                  const row = this.el.closest(".fvm-raffle-row");
                   const link = row?.querySelector(".fvm-raffle-link");
-                  btn = `<button class="fvm-raffle-ok" data-postid="${postId}">
-                    OK
-                  </button>`;
-                  link.insertAdjacentHTML("afterend", btn);
+                  const btn = this.make(
+                    "button",
+                    { className: "fvm-raffle-ok", dataset: { postid: postId } },
+                    "OK",
+                  );
+                  link.after(btn);
                 }
 
                 // todo: change the modal to call the post info API rather than loading up the dataset.
               } else {
-                if (info && info.harvester > 1) {
+                if (
+                  info &&
+                  ((info.harvester > 1 && info.harvester < 7) ||
+                    (info.harvester === 7 && info.harvest_tries >= 3))
+                ) {
                   //there's a problem, it's not going to be retested, so mark it as checked to avoid wasting time.
                   el.dataset.checked = "true";
                   console.log(
@@ -376,6 +382,26 @@
         }
       }
       return "";
+    },
+
+    async fetchRaffleData(postId = null) {
+      const loader = this.findLoader();
+      if (!loader) return null;
+
+      const token = loader.getAttribute("webbit-token");
+      const template = loader.getAttribute("webviewurltemplate");
+      if (!token || !template) return null;
+
+      const origin = new URL(template.split("?")[0]).origin;
+      const data = await FVM_API.fetch({
+        method: "GET",
+        url: `${origin}/api/posts/getRaffleData`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
+      return data || null;
     },
 
     getPostIdFromUrl() {
@@ -554,6 +580,23 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         this.jumpToRow("fvm-jump-oldest", "new");
     },
 
+    make(tag, props = {}, ...children) {
+      const node = document.createElement(tag);
+      for (const [k, v] of Object.entries(props)) {
+        if (k === "style") Object.assign(node.style, v);
+        else if (k === "dataset") Object.assign(node.dataset, v);
+        else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+        else node[k] = v;
+      }
+      for (const child of children) {
+        if (child == null) continue;
+        node.append(
+          typeof child === "string" ? document.createTextNode(child) : child,
+        );
+      }
+      return node;
+    },
+
     getSecondsRemaining(createdUtc) {
       const expirationTime = createdUtc + TWENTY_FOUR_HOURS_S;
       const currentTime = Math.floor(Date.now() / 1000);
@@ -712,59 +755,70 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       const now = Math.floor(Date.now() / 1000);
 
       if (!groupedData || Object.keys(groupedData).length === 0) {
-        body.innerHTML = "No active raffles found.";
+        body.textContent = "No active raffles found.";
         return;
       }
 
       const sortedStars = Object.keys(groupedData).sort((a, b) => b - a);
-      let html = "<div>";
+      const wrapper = this.make("div", {});
 
       sortedStars.forEach((starLevel) => {
         const stickersInLevel = groupedData[starLevel];
         const starCount = "⭐".repeat(parseInt(starLevel));
 
         // STAR LEVEL HEADER
-        html += `<div id="fvm-star-level-header">
-                   ${starLevel} Star Raffles
-                 </div>`;
+        const header = this.make(
+          "div",
+          { id: "fvm-star-level-header" },
+          `${starLevel} Star Raffles`,
+        );
+        wrapper.append(header);
 
-        // 1. Loop through RAFFLES for this star level
         for (const stickerName in stickersInLevel) {
           let raffles = stickersInLevel[stickerName];
           const safeStickerName = stickerName.replace(/[^a-zA-Z0-9\-_.]/g, "");
           if (!Array.isArray(raffles)) raffles = [raffles];
 
           const gotItBtn = gotItData?.[starLevel]?.includes(stickerName)
-            ? ""
-            : `<button class="got-it-btn" data-keyword="${stickerName}" >Got It!</button>`;
+            ? null
+            : this.make(
+                "button",
+                { className: "got-it-btn", dataset: { keyword: stickerName } },
+                "Got It!",
+              );
 
-          html += `
-            <div class="fvm-raffle-container fvm-shadow-sm" id="fvm-sticker-${safeStickerName}">
-              <div class="fvm-raffle-header" >
-                <strong style="color:${FVM_Colours.darkOrange}; font-size: 0.8em;">${stickerName.toUpperCase()} ${starCount}</strong>
-                ${gotItBtn}
-              </div>
-              <div style="padding: 2px 8px;">
-          `;
+          const stickerTitle = this.make(
+            "strong",
+            {
+              style: { color: FVM_Colours.darkOrange, fontSize: "0.8em" },
+            },
+            `${stickerName.toUpperCase()} ${starCount}`,
+          );
 
-          raffles.forEach((raffle, index) => {
+          const raffleHeader = this.make(
+            "div",
+            { className: "fvm-raffle-header" },
+            stickerTitle,
+            gotItBtn,
+          );
+
+          const raffleInner = this.make("div", {
+            style: { padding: "2px 8px" },
+          });
+
+          raffles.forEach((raffle) => {
             const expires = parseInt(raffle.created_utc) + 86400;
             const timeRemaining = this.getSecondsRemaining(
               parseInt(raffle.created_utc),
             );
-
             const isExpired = now > expires;
-
             const raffleId = raffle.id || raffle.post_id;
             const flags = raffle.flags || "";
-
-            // database status is "", active, or done
-            // but done isn't sent
             const isEntered = raffle.status === "active";
 
             let label = isEntered ? this.labels.entered : this.labels.new;
             let newState = isEntered ? "entered" : "new";
-            let btn = "";
+            let btn = null;
 
             if (timeRemaining.state === "expired") {
               newState = "expired";
@@ -775,69 +829,139 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
                   label = this.labels.youWon;
                 } else {
                   label = `Winner: ${raffle.winner} `;
-                  btn = `<button class="fvm-raffle-ok" data-postid="${raffleId}">
-                    OK
-                  </button>`;
+                  btn = this.make(
+                    "button",
+                    {
+                      className: "fvm-raffle-ok",
+                      dataset: { postid: raffleId },
+                    },
+                    "OK",
+                  );
                 }
               }
             }
 
-            const newRow = `
-                <div id="fvm-${raffleId}" class="fvm-raffle-row" data-state=${newState}>
-                  <a href="${raffle.url}" 
-                    class="fvm-raffle-link" 
-                    data-postid="${raffleId}" 
-                    data-status="${raffle.status}"
-                    data-winner="${raffle.winner}"
-                    data-state="${newState}"
-                    >
-                    ${label}
-                  </a>
-                  ${btn}
-                  <div>
-                    <span class="fvm-timer"
-                        data-postid="${raffleId}" 
-                        data-state="${timeRemaining.state}" 
-                        data-created="${raffle.created_utc}"
-                        data-checked="${raffle.winner > "" ? "true" : "false"}">${timeRemaining.text}</span>
-                    <span class="pl-5" data-state="${flags.length > 0 || raffle.harvester > 2 ? "flagged" : "ok"}" 
-                        data-role="info-trigger"
-                        data-postid="${raffleId}" 
-                        data-created="${raffle.created_utc}" 
-                        data-winner="${raffle.winner}" 
-                        data-winner_by="${raffle.winner_by || ""}"
-                        data-author="${raffle.author}" 
-                        data-flags="${flags}" 
-                        data-entrydate="${raffle.entry_date_utc}" 
-                        data-harvester="${raffle.harvester}">${this.info_svg}</span>
-                  </div>
-                </div>`;
-            if (raffleId === "t3_1r2ows8") console.log(newRow);
-            html += newRow;
+            const link = this.make(
+              "a",
+              {
+                href: raffle.url,
+                className: "fvm-raffle-link",
+                dataset: {
+                  postid: raffleId,
+                  status: raffle.status,
+                  winner: raffle.winner,
+                  state: newState,
+                },
+              },
+              label,
+            );
+
+            const timer = this.make(
+              "span",
+              {
+                className: "fvm-timer",
+                dataset: {
+                  postid: raffleId,
+                  state: timeRemaining.state,
+                  created: raffle.created_utc,
+                  checked: raffle.winner > "" ? "true" : "false",
+                },
+              },
+              timeRemaining.text,
+            );
+
+            const infoSpan = this.make("span", {
+              className: "pl-5",
+              dataset: {
+                state:
+                  flags.length > 0 || raffle.harvester > 2 ? "flagged" : "ok",
+                role: "info-trigger",
+                postid: raffleId,
+                created: raffle.created_utc,
+                winner: raffle.winner,
+                winner_by: raffle.winner_by || "",
+                author: raffle.author,
+                flags: flags,
+                entrydate: raffle.entry_date_utc,
+                harvester: raffle.harvester,
+              },
+            });
+            infoSpan.innerHTML = this.info_svg;
+
+            const innerDiv = this.make("div", {}, timer, infoSpan);
+            const newRow = this.make(
+              "div",
+              {
+                id: `fvm-${raffleId}`,
+                className: "fvm-raffle-row",
+                dataset: { state: newState },
+              },
+              link,
+              btn,
+              innerDiv,
+            );
+
+            raffleInner.append(newRow);
           });
-          html += `</div></div>`;
+
+          const stickerContainer = this.make(
+            "div",
+            {
+              className: "fvm-raffle-container fvm-shadow-sm",
+              id: `fvm-sticker-${safeStickerName}`,
+            },
+            raffleHeader,
+            raffleInner,
+          );
+
+          wrapper.append(stickerContainer);
         }
 
-        // 2. INSERT PILLS for this star level right here
-        if (gotItData && gotItData[starLevel]) {
-          html += `<div class="fvm-gotits-container">`;
-          html +=
-            "<span style='font-size:0.75em; color:#888; width:100%;'>Collected Stickers (click to reactivate):</span>";
-          gotItData[starLevel].forEach((pillName) => {
-            html += `
-              <span class="got-it-pill" data-keyword="${pillName}" data-stars="${starLevel}" >
-                ${pillName} ✕
-              </span>`;
+        // PILLS for this star level
+        if (gotItData?.[starLevel]) {
+          const pillsContainer = this.make("div", {
+            className: "fvm-gotits-container",
           });
-          html += `<span class="got-it-pill" data-keyword="all" data-stars="${starLevel}" >${FVM_Emojis.zap} All ✕ </span></div>`;
+
+          const label = this.make(
+            "span",
+            {
+              style: { fontSize: "0.75em", color: "#888", width: "100%" },
+            },
+            "Collected Stickers (click to reactivate):",
+          );
+
+          pillsContainer.append(label);
+
+          gotItData[starLevel].forEach((pillName) => {
+            const pill = this.make(
+              "span",
+              {
+                className: "got-it-pill",
+                dataset: { keyword: pillName, stars: starLevel },
+              },
+              `${pillName} ✕`,
+            );
+            pillsContainer.append(pill);
+          });
+
+          const allPill = this.make(
+            "span",
+            {
+              className: "got-it-pill",
+              dataset: { keyword: "all", stars: starLevel },
+            },
+            `${FVM_Emojis.zap} All ✕`,
+          );
+
+          pillsContainer.append(allPill);
+          wrapper.append(pillsContainer);
         }
       });
 
-      html += `</div>`;
-      body.innerHTML = html;
+      body.replaceChildren(wrapper);
 
       this.updateTimers();
-      // Note: renderPills is now handled inline above, so you may not need this.renderPills(user) anymore
       this.attachEvents(user);
       document.getElementById("fvm-popup").style.display = "block";
     },
@@ -935,18 +1059,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
             : state === "checked"
               ? "checked"
               : "entered";
-          console.log(
-            "raffle click",
-            state,
-            postId,
-            winner,
-            isExpired,
-            newStatus,
-            newState,
-          );
-          // if (isExpired) {
-          //   this.catchRaffleResult();
-          // }
+
           if (state === newState || newState === "missed") {
             this.goToDestination(destination);
             return; // No change needed
@@ -961,40 +1074,33 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
               },
               "POST",
             );
-
-            target.dataset.state = newState; // Change color to indicate entered
-            target.innerHTML = isExpired ? "✅ Checked" : "✅ Entered"; // Update label
-
-            this.setRowLinkState(target, newState);
-
-            if (newState === "entered") {
-              const infoSpan = target.parentElement.querySelector(
-                "span[data-role='info-trigger']",
-              );
-              infoSpan.dataset.entrydate = Math.floor(Date.now() / 1000);
-            }
-
-            if (newState === "checked" && winner.length === 0) {
-              // because the save button looks at the current url the user can't save unless they're on the page
-              this.clearWinnerSaveButtons();
-
-              const saveBtn = document.createElement("span");
-              saveBtn.className = "fvm-save-winner";
-              saveBtn.setAttribute("data-postid", postId);
-              saveBtn.innerHTML = "💾 Save";
-              // 3. Add some style to make it look clickable
-              saveBtn.style.cursor = "pointer";
-              saveBtn.style.marginLeft = "8px";
-
-              // 4. Append it as a new child of the link
-              target.after(saveBtn);
-            }
           } catch (err) {
-            console.error("Error updating link status:", err);
+            console.error("Error updating raffle status:", err);
+            alert("Failed to update raffle status. Please try again.");
+            return;
+          }
+
+          // Update UI immediately for responsiveness
+
+          target.dataset.state = newState; // Change color to indicate entered
+          // todo add a emoji if checked and the user was the winner
+          target.innerHTML = isExpired ? "✅ Checked" : "✅ Entered"; // Update label
+
+          this.setRowLinkState(target, newState);
+
+          // tell the modal when the user entered the raffle
+          if (newState === "entered") {
+            const infoSpan = target.parentElement.querySelector(
+              "span[data-role='info-trigger']",
+            );
+            infoSpan.dataset.entrydate = Math.floor(Date.now() / 1000);
+          }
+
+          if (newState === "checked" && winner.length === 0) {
+            this.setUpSaveButton(target, postId);
           }
 
           this.goToDestination(destination);
-          return; // Let the default anchor behavior open the link
         }
 
         if (target.classList.contains("fvm-raffle-ok")) {
@@ -1002,6 +1108,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
 
           try {
             // Replicating old sendLinkStatus logic
+            target.innerHTML = this.getSpinner(); // Show loading state
             await FVM_API.sendToServer(
               "link",
               {
@@ -1104,6 +1211,112 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       };
     },
 
+    async setUpSaveButton(target, postId) {
+      this.clearWinnerSaveButtons();
+
+      const spinnerBtn = this.make("span", {
+        id: "fvm-saving-spinner",
+        style: { color: FVM_Colours.silverDark, marginLeft: "8px" },
+      });
+      spinnerBtn.innerHTML = this.getSpinner();
+
+      try {
+        // --- Retry up to 3 times to find winner data ---
+        let raffleData = null;
+        const MAX_ATTEMPTS = 3;
+        const RETRY_DELAY_MS = 2000;
+
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+          console.log(
+            `Fetching raffle data, attempt ${attempt}/${MAX_ATTEMPTS}...`,
+          );
+          raffleData = await FVM_Extractor.fetchRaffleData(postId);
+          console.log("Fetched raffle data:", raffleData);
+
+          if (
+            raffleData &&
+            raffleData.winner &&
+            raffleData.winner.name.length > 0
+          ) {
+            break; // Winner found — stop retrying
+          }
+
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+          }
+        }
+
+        spinnerBtn.remove();
+
+        if (
+          !raffleData ||
+          !raffleData.winner ||
+          raffleData.winner.name.length === 0
+        ) {
+          // No winner found after all attempts
+          const noWinnerBtn = this.make(
+            "span",
+            {
+              style: { color: FVM_Colours.silverDark, marginLeft: "8px" },
+            },
+            "❓ No winner yet",
+          );
+          target.after(noWinnerBtn);
+        } else {
+          // --- Verify owner matches the post author in the page HTML ---
+          const postEl =
+            document.querySelector(`shreddit-post[id="t3_${postId}"]`) ||
+            document.querySelector("shreddit-post");
+          const pageAuthor = postEl ? postEl.getAttribute("author") : null;
+          const ownerName = raffleData.owner?.name ?? "";
+          const authorMatches =
+            !pageAuthor || ownerName.toLowerCase() === pageAuthor.toLowerCase();
+
+          console.log(
+            `Owner check: raffleData.owner="${ownerName}", page author="${pageAuthor}", match=${authorMatches}`,
+          );
+
+          if (!authorMatches) {
+            const mismatchBtn = this.make(
+              "span",
+              {
+                title: `Raffle owner "${ownerName}" ≠ post author "${pageAuthor}"`,
+                style: { color: FVM_Colours.red, marginLeft: "8px" },
+              },
+              "⚠️ Owner mismatch",
+            );
+            target.after(mismatchBtn);
+          } else {
+            // All good — show Save button
+
+            const saveBtn = this.make(
+              "span",
+              {
+                className: "fvm-save-winner",
+                dataset: { postid: postId },
+                style: { cursor: "pointer", marginLeft: "8px" },
+              },
+              "💾 Save",
+            );
+            target.after(saveBtn);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching raffle data for save button:", err);
+        spinnerBtn.remove();
+
+        const errorBtn = this.make(
+          "span",
+          {
+            dataset: { postid: postId },
+            style: { color: FVM_Colours.red, marginLeft: "8px" },
+          },
+          "⚠️ Error",
+        );
+
+        target.after(errorBtn);
+      }
+    },
     clearWinnerSaveButtons() {
       const bodyContainer = document.getElementById("fvm-body");
       //there should only be one
@@ -1473,6 +1686,8 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         };
       });
     },
+
+    getContentHTML(info) {},
   };
   // Run immediately if document is ready, otherwise wait for load
   // --- 3. EXECUTION ---
