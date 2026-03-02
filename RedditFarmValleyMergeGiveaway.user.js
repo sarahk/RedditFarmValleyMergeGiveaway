@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.27
+// @version      3.28
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -237,11 +237,14 @@
                 );
 
                 if (!youWon) {
-                  const row = this.el.closest(".fvm-raffle-row");
+                  const row = el.closest(".fvm-raffle-row");
                   const link = row?.querySelector(".fvm-raffle-link");
-                  const btn = this.make(
+                  const btn = FVM_UI.make(
                     "button",
-                    { className: "fvm-raffle-ok", dataset: { postid: postId } },
+                    {
+                      className: "fvm-raffle-ok",
+                      dataset: { postid: postId, from: "stale" },
+                    },
                     "OK",
                   );
                   link.after(btn);
@@ -833,7 +836,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
                     "button",
                     {
                       className: "fvm-raffle-ok",
-                      dataset: { postid: raffleId },
+                      dataset: { postid: raffleId, from: "render" },
                     },
                     "OK",
                   );
@@ -1219,12 +1222,13 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         style: { color: FVM_Colours.silverDark, marginLeft: "8px" },
       });
       spinnerBtn.innerHTML = this.getSpinner();
-
+      target.after(spinnerBtn);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
       try {
         // --- Retry up to 3 times to find winner data ---
         let raffleData = null;
-        const MAX_ATTEMPTS = 3;
-        const RETRY_DELAY_MS = 2000;
+        const MAX_ATTEMPTS = 5;
+        const RETRY_DELAY_MS = 5000;
 
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
           console.log(
@@ -1247,7 +1251,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         }
 
         spinnerBtn.remove();
-
+        // we've waited long enough, time to move on
         if (
           !raffleData ||
           !raffleData.winner ||
@@ -1267,7 +1271,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
           const postEl =
             document.querySelector(`shreddit-post[id="t3_${postId}"]`) ||
             document.querySelector("shreddit-post");
-          const pageAuthor = postEl ? postEl.getAttribute("author") : null;
+          const pageAuthor = postEl ? postEl.dataset.author : null;
           const ownerName = raffleData.owner?.name ?? "";
           const authorMatches =
             !pageAuthor || ownerName.toLowerCase() === pageAuthor.toLowerCase();
