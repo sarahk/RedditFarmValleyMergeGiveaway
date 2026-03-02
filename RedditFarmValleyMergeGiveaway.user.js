@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.28
+// @version      3.29
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -236,8 +236,8 @@
                   youWon ? FVM_UI.labels.youWon : `Winner: ${info.winner}`,
                 );
 
+                const row = el.closest(".fvm-raffle-row");
                 if (!youWon) {
-                  const row = el.closest(".fvm-raffle-row");
                   const link = row?.querySelector(".fvm-raffle-link");
                   const btn = FVM_UI.make(
                     "button",
@@ -248,6 +248,11 @@
                     "OK",
                   );
                   link.after(btn);
+                }
+
+                const notify = row.querySelector("[data-role='notify']");
+                if (notify) {
+                  notify.remove();
                 }
 
                 // todo: change the modal to call the post info API rather than loading up the dataset.
@@ -504,6 +509,7 @@
 .fvm-shadow-sm { box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .075) !important; }
 .fvm-shadow    { box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15) !important; }
 .fvm-shadow-lg { box-shadow: 0 1rem 3rem rgba(0, 0, 0, .175) !important; }
+.fvm-highlight { background-color: ${FVM_Colours.yellow} !important; }
 span[data-role="info-trigger"][data-state="ok"] { color: ${FVM_Colours.purple}; }
 span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}; }
 .pl-5 { padding-left: 5px !important; }
@@ -1109,6 +1115,12 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         if (target.classList.contains("fvm-raffle-ok")) {
           const postId = target.getAttribute("data-postid");
 
+          // regardless of the outcome, we're doing this manually
+          // don't let the stale check run
+          const timerSpan = target.parentElement.querySelector(".fvm-timer");
+          if (timerSpan) {
+            timerSpan.dataset.checked = "true";
+          }
           try {
             // Replicating old sendLinkStatus logic
             target.innerHTML = this.getSpinner(); // Show loading state
@@ -1149,9 +1161,8 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
               "span[data-role='info-trigger']",
             );
             if (infoSpan) {
-              infoSpan.setAttribute("data-winner", winnerName);
+              infoSpan.dataset.winner = winnerName;
             }
-            this.setRowLinkState(target, "checked");
           } catch (error) {
             // 4. Error Handling (Optional but recommended)
             console.error("Save failed:", error);
@@ -1261,6 +1272,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
           const noWinnerBtn = this.make(
             "span",
             {
+              dataset: { role: "notify" },
               style: { color: FVM_Colours.silverDark, marginLeft: "8px" },
             },
             "❓ No winner yet",
@@ -1284,6 +1296,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
             const mismatchBtn = this.make(
               "span",
               {
+                dataset: { role: "notify" },
                 title: `Raffle owner "${ownerName}" ≠ post author "${pageAuthor}"`,
                 style: { color: FVM_Colours.red, marginLeft: "8px" },
               },
@@ -1312,7 +1325,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         const errorBtn = this.make(
           "span",
           {
-            dataset: { postid: postId },
+            dataset: { postid: postId, role: "notify" },
             style: { color: FVM_Colours.red, marginLeft: "8px" },
           },
           "⚠️ Error",
@@ -1367,11 +1380,12 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
             row,
             created,
             link: row.querySelector(".fvm-raffle-link"),
+            row: row,
           };
         }
       }
 
-      return best.link;
+      return best.row;
     },
 
     jumpToRow(btnSelector, state) {
@@ -1392,10 +1406,10 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         nextRow.scrollIntoView({ behavior: "smooth", block: "center" });
 
         // 3. Optional: Brief highlight effect so the user sees which one it is
-        const originalBg = nextRow.style.backgroundColor;
-        nextRow.style.backgroundColor = FVM_Colours.yellow; // Light highlight
+
+        nextRow.classList.add("fvm-highlight");
         setTimeout(() => {
-          nextRow.style.backgroundColor = originalBg;
+          nextRow.classList.remove("fvm-highlight");
         }, 2000);
       } else {
         this.flashButtonOff(btnSelector);
@@ -1505,193 +1519,312 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
   const FVM_Modal = {
     async showInfo(info, triggerElement) {
       console.log("Showing info modal for post:", info.postid);
-      // 1. Remove existing modal if one is already open
+
       const existingModal = document.querySelector(".fvm_modal_overlay");
       if (existingModal) existingModal.remove();
 
-      // 3. Create Modal Element
-      const overlay = document.createElement("div");
-      overlay._triggerElement = triggerElement; // Store reference to the element that triggered the modal
+      const overlay = FVM_UI.make("div", { className: "fvm_modal_overlay" });
+      overlay._triggerElement = triggerElement;
+      document.body.appendChild(overlay);
+
       const rowState = FVM_UI.getRowState(triggerElement);
-      overlay.className = "fvm_modal_overlay";
 
-      // 2. Calculate "Time Since" minus 24 hours
-      const timeRemaining = FVM_UI.getSecondsRemaining(info.created);
-      const timeSince = FVM_UI.getSecondsSinceClose(info.created);
+      // Show spinner while fetching
+      const contentDiv = FVM_UI.make("div", { id: "fvm-modal-content" });
+      contentDiv.innerHTML = FVM_UI.getSpinner();
 
-      const created = FVM_UI.formatRecentUnix(info.created);
-      const entered =
-        info.entryDate === 0 ? "" : FVM_UI.formatRecentUnix(info.entryDate);
+      const modalBox = FVM_UI.make(
+        "div",
+        {
+          className: "fvm_modal",
+          style: { fontFamily: "'Courier New', Courier, monospace" },
+        },
+        contentDiv,
+      );
 
-      const winnerCopyButton =
-        info.winner && info.winner !== "" && info.winner !== "null"
-          ? `<span class="fvm-copy-icon" data-copy="${info.winner}" title="Copy Winner">⧉</span>`
-          : "";
+      const footer = FVM_UI.make("div", {
+        style: {
+          marginTop: "15px",
+          display: "flex",
+          gap: "10px",
+          fontFamily: "sans-serif",
+        },
+      });
+      const closeBtn = FVM_UI.make(
+        "button",
+        {
+          id: "fvmCloseModal",
+          style: {
+            padding: "0 10px",
+            border: `1px solid ${FVM_Colours.silverDark}`,
+            cursor: "pointer",
+          },
+        },
+        "Close",
+      );
+      const authorBtn = FVM_UI.make(
+        "button",
+        {
+          id: "fvmGoAuthor",
+          style: {
+            background: FVM_Colours.darkOrange,
+            color: "white",
+            border: "none",
+            padding: "0 10px",
+            cursor: "pointer",
+            borderRadius: "4px",
+          },
+        },
+        "Go to Author",
+      );
+      footer.append(closeBtn, authorBtn);
+      modalBox.append(footer);
+      overlay.append(modalBox);
 
-      let text = `<div class="fvm-modal-line">
-            <span>Author: <strong>${info.author}</strong></span>
-            <span class="fvm-copy-icon" data-copy="${info.author}" title="Copy Author">⧉</span>
-        </div>
-        <div class="fvm-modal-line">
-            <span>Winner: <strong>${info.winner}</strong></span>
-            ${winnerCopyButton}
-        </div>
-        <div class="fvm-modal-line">
-            <span>Created: <strong>${created}</strong></span>
-        </div>
-        <div class="fvm-modal-line">
-            <span>Entered: <strong>${entered}</strong></span>
-        </div>`;
-      if (timeRemaining.state === "expired") {
-        text += `<div class="fvm-modal-line">
-            <span>Closed: <strong>${timeSince.text} ago</strong></span>
-        </div>`;
-      } else {
-        text += `<div class="fvm-modal-line">
-            <span>Closes in: <strong>${timeRemaining.text}</strong></span>
-        </div>`;
+      // Fetch fresh data from server
+      let fresh = {};
+      try {
+        fresh =
+          (await FVM_API.sendToServer(
+            "post",
+            { post_id: info.postid },
+            "GET",
+          )) || {};
+      } catch (e) {
+        console.error("FVM_Modal: Failed to fetch post info", e);
       }
-      // todo once we have more than just a "deleted" flag we can expand this section to show more details about the flags, but for now we'll just show the count and let users click through to see which ones they are
-      // const count = info.flags
-      //   ? info.flags.split(",").filter(Boolean).length
-      //   : 0;
-      const flagsString = info.flags || "";
-      const flagsArray = flagsString.split(",").filter(Boolean);
 
-      // Initialize an object to store the counts
+      // Merge dataset info with fresh server data (server wins)
+      const d = {
+        author: fresh.author ?? info.author,
+        winner: fresh.winner ?? info.winner ?? "",
+        winner_by: fresh.winner_by ?? info.winner_by ?? "",
+        created: fresh.created_utc ? parseInt(fresh.created_utc) : info.created,
+        entryDate: info.entryDate,
+        postid: info.postid,
+        flags: fresh.flags ?? info.flags ?? "",
+        harvester:
+          fresh.harvester != null ? parseInt(fresh.harvester) : info.harvester,
+        harvest_tries: fresh.harvest_tries ?? 0,
+        participants: fresh.participants ?? "",
+      };
+
+      const timeRemaining = FVM_UI.getSecondsRemaining(d.created);
+      const timeSince = FVM_UI.getSecondsSinceClose(d.created);
+      const created = FVM_UI.formatRecentUnix(d.created);
+      const entered =
+        d.entryDate === 0 ? "" : FVM_UI.formatRecentUnix(d.entryDate);
+
+      const flagsArray = (d.flags || "").split(",").filter(Boolean);
       const flagCounts = flagsArray.reduce((acc, flag) => {
-        const cleanFlag = flag.trim().toLowerCase();
-        acc[cleanFlag] = (acc[cleanFlag] || 0) + 1;
+        const f = flag.trim().toLowerCase();
+        acc[f] = (acc[f] || 0) + 1;
         return acc;
       }, {});
 
-      // Example Result: { deleted: 1, incorrect: 2 }
-      console.log(flagCounts);
-
-      const getHarvesterText = (info) => {
-        if (info.harvester === 0) return "Unknown status";
-        if (info.harvester === 1) {
-          if (info.winner_by === "harvester") return "Success";
-          else return "Not visited";
-        }
-
-        if (info.harvester === 2) return "Deleted by User";
-        if (info.harvester === 3) return "Deleted by Reddit";
-        if (info.harvester === 4) return "No token found";
-        if (info.harvester === 5) return "Network Error";
-        if (info.harvester === 6) return "Request timeout";
-        if (info.harvester === 7) return "No winner found";
-
+      const getHarvesterText = (d) => {
+        if (d.harvester === 0) return "Unknown status";
+        if (d.harvester === 1)
+          return d.winner_by === "harvester" ? "Success" : "Not visited";
+        if (d.harvester === 2) return "Deleted by User";
+        if (d.harvester === 3) return "Deleted by Reddit";
+        if (d.harvester === 4) return "No token found";
+        if (d.harvester === 5) return "Network Error";
+        if (d.harvester === 6) return "Request timeout";
+        if (d.harvester === 7) return `No winner found [${d.harvest_tries}]`;
         return "Unknown status";
       };
 
-      text += `<div class="fvm-modal-line">
-            <span>Flags: Deleted: <strong>${flagCounts.deleted || 0}</strong>, Incorrect: <strong>${flagCounts.incorrect || 0}</strong></span>
-        </div>`;
+      const makeLine = (...children) =>
+        FVM_UI.make("div", { className: "fvm-modal-line" }, ...children);
+      const makeLabel = (text) => FVM_UI.make("span", {}, text);
+      const makeStrong = (text) => {
+        const s = FVM_UI.make("strong", {});
+        s.textContent = text;
+        return s;
+      };
+      const makeCopy = (value) =>
+        FVM_UI.make(
+          "span",
+          {
+            className: "fvm-copy-icon",
+            dataset: { copy: value },
+            title: "Copy",
+          },
+          "⧉",
+        );
 
-      text += `<div class="fvm-modal-line">
-            <span>Flag As: <button id='fvm-flag-deleted' data-role="flagproblems" ${rowState === "new" ? "disabled" : ""} style="padding:0 10px;border:1px solid ${FVM_Colours.silverDark};cursor:pointer;" data-postid=${info.postid} data-author="${info.author}" data-flag="deleted">Deleted</button></span>
-            <span> or <button id='fvm-flag-incorrect' data-role="flagproblems" ${rowState === "new" ? "disabled" : ""} style="padding:0 10px;border:1px solid ${FVM_Colours.silverDark};cursor:pointer;" data-postid=${info.postid} data-author="${info.author}" data-flag="incorrect">Incorrect</button></span>
-           </div>`;
+      const content = FVM_UI.make("div", { id: "fvm-modal-content" });
+
+      // Post Id
+      const postidLabel = makeLabel("Post Id: ");
+      postidLabel.append(makeStrong(d.postid));
+      content.append(makeLine(postidLabel, makeCopy(d.postid)));
+
+      // Author
+      const authorLabel = makeLabel("Author: ");
+      authorLabel.append(makeStrong(d.author));
+      content.append(makeLine(authorLabel, makeCopy(d.author)));
 
       if (timeRemaining.state === "expired") {
-        text += `<div class="fvm-modal-line">
-            <span>Harvest: <strong>${getHarvesterText(info)}</strong></span>
-        </div>`;
+        // Winner
+        const winnerLabel = makeLabel("Winner: ");
+        winnerLabel.append(makeStrong(d.winner || "—"));
+        const winnerLine = makeLine(winnerLabel);
+        if (d.winner && d.winner !== "" && d.winner !== "null")
+          winnerLine.append(makeCopy(d.winner));
+        content.append(winnerLine);
+
+        // Participants
+        if (d.participants !== "") {
+          const partLabel = makeLabel("Participants: ");
+          partLabel.append(makeStrong(d.participants));
+          content.append(makeLine(partLabel));
+        }
       }
 
-      overlay.innerHTML = `
-          <div class="fvm_modal" style="font-family:'Courier New', Courier, monospace">
-              <div id="fvm-modal-content" style="font-family: inherit;">${text}</div>
-              <div style="margin-top:15px; display:flex; gap:10px;font-family:sans-serif;">
-                  <button id="fvmCloseModal" style="padding:0 10px;border:1px solid ${FVM_Colours.silverDark};cursor:pointer;">Close</button>
-                  <button id="fvmGoAuthor" style="background: ${FVM_Colours.darkOrange};color:white;border:none;padding:0 10px;cursor:pointer;border-radius:4px;">Go to Author</button>
-              </div>
-          </div>
-        `;
+      // Created / Entered
+      const createdLabel = makeLabel("Created: ");
+      createdLabel.append(makeStrong(created));
+      content.append(makeLine(createdLabel));
 
-      //document.body.appendChild(modal);
-      document.body.appendChild(overlay);
+      const enteredLabel = makeLabel("Entered: ");
+      enteredLabel.append(makeStrong(entered));
+      content.append(makeLine(enteredLabel));
 
-      // Click outside closes modal
+      // Closed / Closes in
+      if (timeRemaining.state === "expired") {
+        const closedLabel = makeLabel("Closed: ");
+        closedLabel.append(makeStrong(`${timeSince.text} ago`));
+        content.append(makeLine(closedLabel));
+      } else {
+        const closesLabel = makeLabel("Closes in: ");
+        closesLabel.append(makeStrong(timeRemaining.text));
+        content.append(makeLine(closesLabel));
+      }
+
+      // Flags
+      const flagsLabel = makeLabel(`Flags: Deleted: `);
+      flagsLabel.append(
+        makeStrong(flagCounts.deleted || 0),
+        document.createTextNode(", Incorrect: "),
+        makeStrong(flagCounts.incorrect || 0),
+      );
+      content.append(makeLine(flagsLabel));
+
+      // Flag As buttons
+      const flagDeletedBtn = FVM_UI.make(
+        "button",
+        {
+          id: "fvm-flag-deleted",
+          dataset: {
+            role: "flagproblems",
+            postid: d.postid,
+            author: d.author,
+            flag: "deleted",
+          },
+          style: {
+            padding: "0 10px",
+            border: `1px solid ${FVM_Colours.silverDark}`,
+            cursor: "pointer",
+          },
+        },
+        "Deleted",
+      );
+      if (rowState === "new") flagDeletedBtn.disabled = true;
+
+      const flagIncorrectBtn = FVM_UI.make(
+        "button",
+        {
+          id: "fvm-flag-incorrect",
+          dataset: {
+            role: "flagproblems",
+            postid: d.postid,
+            author: d.author,
+            flag: "incorrect",
+          },
+          style: {
+            padding: "0 10px",
+            border: `1px solid ${FVM_Colours.silverDark}`,
+            cursor: "pointer",
+          },
+        },
+        "Incorrect",
+      );
+      if (rowState === "new") flagIncorrectBtn.disabled = true;
+
+      const flagLineLeft = FVM_UI.make("span", {}, "Flag As: ", flagDeletedBtn);
+      const flagLineRight = FVM_UI.make("span", {}, " or ", flagIncorrectBtn);
+      content.append(makeLine(flagLineLeft, flagLineRight));
+
+      // Harvest status (expired only)
+      if (timeRemaining.state === "expired") {
+        const harvestLabel = makeLabel("Harvest: ");
+        harvestLabel.append(makeStrong(getHarvesterText(d)));
+        content.append(makeLine(harvestLabel));
+      }
+
+      // Replace spinner with real content
+      modalBox.querySelector("#fvm-modal-content").replaceWith(content);
+
+      // --- Event Listeners ---
       overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) {
-          overlay.remove();
-        }
+        if (e.target === overlay) overlay.remove();
       });
+      modalBox.addEventListener("click", (e) => e.stopPropagation());
 
-      overlay.querySelector(".fvm_modal").addEventListener("click", (e) => {
-        e.stopPropagation();
-      });
-
-      // Prevent inside clicks from bubbling to overlay
       overlay.querySelectorAll("[data-role='flagproblems']").forEach((btn) => {
         btn.addEventListener("click", async (e) => {
-          console.log("[FVM] Modal click:", e.target);
           e.stopPropagation();
-
           const postId = e.target.dataset.postid;
           const user = localStorage.getItem("fvm_user_id");
-
-          //await new Promise(requestAnimationFrame);
           const flagType = e.target.dataset.flag;
-          console.log("Flagging post", {
-            postid: postId,
-            user: user,
-            flag: flagType,
-          });
           if (
             confirm(`Are you sure you want to flag this raffle as ${flagType}?`)
           ) {
             try {
-              e.target.disabled = true; // Stays disabled for this iteration of the modal.
+              e.target.disabled = true;
               e.target.innerHTML = `${FVM_UI.getSpinner()} Flagging...</span>`;
               await FVM_API.sendToServer("flag_deleted", {
                 postid: postId,
-                user: user,
+                user,
                 flag: flagType,
               });
-              // 3. Success State
               e.target.textContent = "✅ Flagged!";
-
               const originTrigger = overlay._triggerElement;
               if (originTrigger) {
                 originTrigger.dataset.state = "flagged";
-                let flagJoin =
+                const flagJoin =
                   originTrigger.dataset.flags.length > 0 ? "," : "";
-                originTrigger.dataset.flags += flagJoin + "deleted"; // Set a simple flag to indicate deletion; can be expanded later for multiple flags
+                originTrigger.dataset.flags += flagJoin + "deleted";
               }
-
-              //todo find the popup row for this post and change the colour to indicate it's deleted/flagged without needing a refresh
             } catch (error) {
-              console.error("Error flagging raffle as deleted:", error);
+              console.error("Error flagging raffle:", error);
             }
           }
         });
       });
 
-      // 4. Listeners
-      overlay.querySelector("#fvmCloseModal").onclick = () => overlay.remove();
-      overlay.querySelector("#fvmGoAuthor").onclick = () => {
-        window.open(`https://www.reddit.com/u/${author}`, "_blank");
+      closeBtn.onclick = () => overlay.remove();
+      authorBtn.onclick = () => {
+        window.open(`https://www.reddit.com/u/${d.author}`, "_blank");
         overlay.remove();
       };
-      // Event Listener for Copy Icons
+
       overlay.querySelectorAll(".fvm-copy-icon").forEach((icon) => {
         icon.onclick = () => {
-          const text = icon.getAttribute("data-copy");
-          navigator.clipboard.writeText(text).then(() => {
-            const originalIcon = icon.textContent;
-            icon.textContent = "✅";
-            setTimeout(() => {
-              icon.textContent = originalIcon;
-            }, 2000);
-          });
+          navigator.clipboard
+            .writeText(icon.getAttribute("data-copy"))
+            .then(() => {
+              const orig = icon.textContent;
+              icon.textContent = "✅";
+              setTimeout(() => {
+                icon.textContent = orig;
+              }, 2000);
+            });
         };
       });
     },
-
-    getContentHTML(info) {},
   };
   // Run immediately if document is ready, otherwise wait for load
   // --- 3. EXECUTION ---
