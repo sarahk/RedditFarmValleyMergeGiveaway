@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.29
+// @version      3.30
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -281,6 +281,7 @@
       }, 15000); // Run every 15 seconds
     },
 
+    // gets the json list and sends to the database
     async getJsonAndSend(redditUrl) {
       try {
         const json = await FVM_API.getExternal(redditUrl);
@@ -372,6 +373,16 @@
 
         try {
           console.log(`FVM_Extractor: Winner found: ${raffleData.winner.name}`);
+          console.log("FVM_Extractor", {
+            post_id: this.getPostIdFromUrl(),
+            winner: raffleData.winner.name,
+            participants: raffleData.participantIds
+              ? raffleData.participantIds.length
+              : 0,
+            owner: raffleData.owner.name,
+            sticker_id: raffleData.stickerId,
+            end_time: Math.floor((raffleData.stickerbookEndTime ?? 0) / 1000),
+          });
           await FVM_API.sendToServer(
             "winner",
             {
@@ -381,6 +392,8 @@
                 ? raffleData.participantIds.length
                 : 0,
               owner: raffleData.owner.name,
+              sticker_id: raffleData.stickerId,
+              end_time: raffleData.stickerbookEndTime,
             },
             "POST",
           );
@@ -455,9 +468,12 @@
   };
   // --- 2. UI MODULE ---
   const FVM_UI = {
+    STICKER_PATH:
+      "https://playfmv-94o1jc-0-3-31-webview.devvit.net/raffle/stickers/stickerbook-default/",
     init() {
       console.info("FVM_UI: Initializing...");
       this.injectStyles();
+      this.getStickerImages();
       this.drawPopup();
       this.refreshPopup();
       this.startGlobalTimer();
@@ -530,7 +546,10 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
   box-shadow: 0 10px 25px rgba(0,0,0,0.25);
   max-width: 320px;
 }
-
+.fvm-sticker-btn { background: none; border: none; cursor: pointer; font-size: 0.9em; padding: 0 3px; opacity: 0.75; line-height: 1; }
+.fvm-sticker-btn:hover { opacity: 1; }
+.fvm-sticker-popover { position: absolute; z-index: 100002; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.fvm-sticker-popover img { display: block; width: 120px; height: 150px; object-fit: contain; margin-bottom: 0;}
       `;
 
       document.head.appendChild(style);
@@ -604,6 +623,16 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         );
       }
       return node;
+    },
+
+    async getStickerImages() {
+      this.stickerImages = await FVM_API.sendToServer("stickers", {}, "GET");
+      console.log("[FVM] Stickers", this.stickerImages);
+    },
+
+    getStickerImage(keyword) {
+      const stickerName = keyword.toLowerCase();
+      return this.STICKER_PATH + this.stickerImages?.[stickerName];
     },
 
     getSecondsRemaining(createdUtc) {
@@ -786,6 +815,9 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         for (const stickerName in stickersInLevel) {
           let raffles = stickersInLevel[stickerName];
           const safeStickerName = stickerName.replace(/[^a-zA-Z0-9\-_.]/g, "");
+
+          const stickerPreview = this.getStickerPreview(stickerName);
+
           if (!Array.isArray(raffles)) raffles = [raffles];
 
           const gotItBtn = gotItData?.[starLevel]?.includes(stickerName)
@@ -808,6 +840,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
             "div",
             { className: "fvm-raffle-header" },
             stickerTitle,
+            stickerPreview,
             gotItBtn,
           );
 
@@ -973,6 +1006,55 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       this.updateTimers();
       this.attachEvents(user);
       document.getElementById("fvm-popup").style.display = "block";
+    },
+
+    // used by render()
+    getStickerPreview(stickerName) {
+      console.info(
+        `[FVM] Stickername for ${stickerName}: ${this.getStickerImage(stickerName)}`,
+      );
+      const stickerImagePath = this.getStickerImage(stickerName);
+
+      if (!stickerImagePath) return null;
+
+      const stickerImage = this.make("img", {
+        src: stickerImagePath,
+        style: { height: "30px", width: "20px", margin: "2px" },
+      });
+      const stickerPreviewBtn = this.make(
+        "button",
+        { className: "fvm-sticker-btn", title: "Preview sticker" },
+        stickerImage,
+      );
+
+      stickerPreviewBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        document
+          .querySelectorAll(".fvm-sticker-popover")
+          .forEach((el) => el.remove());
+        const popover = this.make("div", {
+          className: "fvm-sticker-popover",
+        });
+        const img = this.make("img", {});
+        img.src = stickerImagePath;
+        img.alt = stickerName;
+        popover.append(img);
+        const rect = stickerPreviewBtn.getBoundingClientRect();
+        const popupRect = document
+          .getElementById("fvm-popup")
+          .getBoundingClientRect();
+        popover.style.top = rect.bottom - popupRect.top + 4 + "px";
+        popover.style.left = rect.left - popupRect.left + "px";
+        document.getElementById("fvm-popup").appendChild(popover);
+        const dismiss = (ev) => {
+          if (!popover.contains(ev.target) && ev.target !== stickerPreviewBtn) {
+            popover.remove();
+            document.removeEventListener("click", dismiss);
+          }
+        };
+        setTimeout(() => document.addEventListener("click", dismiss), 0);
+      });
+      return stickerPreviewBtn;
     },
 
     catchInfoButtonClicks(e, user) {
