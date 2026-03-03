@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.30
+// @version      3.31
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -34,6 +34,7 @@
     five: "5️⃣",
     top: "🔝",
     zap: "⚡",
+    explode: "💥",
     hourglass: "⌛",
     redflag: "🚩",
   };
@@ -84,11 +85,6 @@
             if (res.status >= 200 && res.status < 300) {
               try {
                 resolve(JSON.parse(res.responseText));
-                // console.log([
-                //   "FVM_API.fetch response parsed as JSON:",
-                //   res.responseText,
-                //   options,
-                // ]);
               } catch (e) {
                 console.warn(
                   "FVM_API.fetch JSON parse error:",
@@ -206,9 +202,9 @@
           console.log(
             `Checking stale raffle: postId=${el.dataset.postid}, timeSinceExpiry=${timeSinceExpiry}s`,
           );
-          if (timeSinceExpiry >= 130) {
+          if (timeSinceExpiry >= 90) {
             console.log(
-              `Raffle expired over 2 minutes ago, checking for winner...`,
+              `Raffle expired over 1.5 minutes ago, checking for winner...`,
               el.dataset,
             );
 
@@ -347,65 +343,33 @@
   const FVM_Extractor = {
     async saveRaffleData(postId = null) {
       console.log("FVM_Extractor: Checking page for raffle data...");
-      const loader = this.findLoader();
-      if (!loader) return;
+      const raffleData = await this.fetchRaffleData();
+      if (!raffleData?.winner?.name) return "";
 
-      const token = loader.getAttribute("webbit-token");
-      const template = loader.getAttribute("webviewurltemplate");
-      let raffleData = null;
-
-      if (token && template) {
-        try {
-          const origin = new URL(template.split("?")[0]).origin;
-          raffleData = await FVM_API.fetch({
-            method: "GET",
-            url: `${origin}/api/posts/getRaffleData`,
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
-            },
-          });
-          //console.log("FVM_Extractor: Raffle data retrieved:", raffleData);
-          if (!raffleData || raffleData.winner.name.length === 0) return "";
-        } catch (e) {
-          console.error("FVM_Extractor: getRaffleData failed", e);
-        }
-
-        try {
-          console.log(`FVM_Extractor: Winner found: ${raffleData.winner.name}`);
-          console.log("FVM_Extractor", {
+      try {
+        console.log(`FVM_Extractor: Winner found: ${raffleData.winner.name}`);
+        await FVM_API.sendToServer(
+          "winner",
+          {
             post_id: this.getPostIdFromUrl(),
             winner: raffleData.winner.name,
             participants: raffleData.participantIds
               ? raffleData.participantIds.length
               : 0,
-            owner: raffleData.owner.name,
+            owner: raffleData.owner?.name || "",
             sticker_id: raffleData.stickerId,
             end_time: Math.floor((raffleData.stickerbookEndTime ?? 0) / 1000),
-          });
-          await FVM_API.sendToServer(
-            "winner",
-            {
-              post_id: this.getPostIdFromUrl(),
-              winner: raffleData.winner.name,
-              participants: raffleData.participantIds
-                ? raffleData.participantIds.length
-                : 0,
-              owner: raffleData.owner.name,
-              sticker_id: raffleData.stickerId,
-              end_time: raffleData.stickerbookEndTime,
-            },
-            "POST",
-          );
-          return raffleData.winner.name;
-        } catch (e) {
-          console.error("FVM_Extractor: Save failed", e);
-        }
+          },
+          "POST",
+        );
+        return raffleData.winner.name;
+      } catch (e) {
+        console.error("FVM_Extractor: Save failed", e);
       }
       return "";
     },
 
-    async fetchRaffleData(postId = null) {
+    async fetchRaffleData() {
       const loader = this.findLoader();
       if (!loader) return null;
 
@@ -414,15 +378,67 @@
       if (!token || !template) return null;
 
       const origin = new URL(template.split("?")[0]).origin;
-      const data = await FVM_API.fetch({
-        method: "GET",
-        url: `${origin}/api/posts/getRaffleData`,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      });
-      return data || null;
+
+      try {
+        const data = await FVM_API.fetch({
+          method: "GET",
+          url: `${origin}/api/posts/getRaffleData`,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+
+        if (data?.winner?.name) return data;
+
+        // No winner yet — try claiming to trigger winner selection
+        console.log("FVM_Extractor: No winner, attempting claimRaffle...");
+        const claimed = await this.claimRaffle(origin, token);
+        if (!claimed?.winnerName) return null;
+
+        console.log(
+          "FVM_Extractor: claimRaffle resolved winner:",
+          claimed.winnerName,
+        );
+        // Re-fetch for full data now winner is resolved
+        const retryData = await FVM_API.fetch({
+          method: "GET",
+          url: `${origin}/api/posts/getRaffleData`,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+
+        return {
+          winner: { name: claimed.winnerName },
+          owner: retryData?.owner || { name: "" },
+          participantIds: retryData?.participantIds || [],
+          stickerId: retryData?.stickerId || "",
+          stickerbookEndTime: retryData?.stickerbookEndTime || 0,
+        };
+      } catch (e) {
+        console.error("FVM_Extractor: fetchRaffleData failed", e);
+        return null;
+      }
+    },
+
+    async claimRaffle(origin, token) {
+      try {
+        const data = await FVM_API.fetch({
+          method: "GET",
+          url: `${origin}/api/posts/claimRaffle`,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+        console.log("FVM_Extractor: claimRaffle response:", data);
+        return data || null;
+      } catch (e) {
+        console.error("FVM_Extractor: claimRaffle failed", e);
+        return null;
+      }
     },
 
     getPostIdFromUrl() {
@@ -546,10 +562,11 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
   box-shadow: 0 10px 25px rgba(0,0,0,0.25);
   max-width: 320px;
 }
-.fvm-sticker-btn { background: none; border: none; cursor: pointer; font-size: 0.9em; padding: 0 3px; opacity: 0.75; line-height: 1; }
+.fvm-sticker-btn { background: none; border: none; border-radius: 0; cursor: pointer; font-size: 0.9em; padding: 0 3px; opacity: 0.75; line-height: 1; }
 .fvm-sticker-btn:hover { opacity: 1; }
 .fvm-sticker-popover { position: absolute; z-index: 100002; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
 .fvm-sticker-popover img { display: block; width: 120px; height: 150px; object-fit: contain; margin-bottom: 0;}
+.fvm-star-level { height: 30px; margin: 2px; }
       `;
 
       document.head.appendChild(style);
@@ -565,8 +582,8 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
 
     drawPopup() {
       if (document.getElementById("fvm-popup")) return;
-      const div = document.createElement("div");
-      div.id = "fvm-popup";
+      const div = this.make("div", { id: "fvm-popup" });
+      //div.id = "fvm-popup";
       div.innerHTML = `
         <div id="fvm-header">
           <span style="padding-top: .5em;">🎁 Find Raffles</span>
@@ -802,7 +819,12 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
 
       sortedStars.forEach((starLevel) => {
         const stickersInLevel = groupedData[starLevel];
-        const starCount = "⭐".repeat(parseInt(starLevel));
+        //const starCount = "⭐".repeat(parseInt(starLevel));
+        const starImage = this.make("img", {
+          src: `https://fvm.itamer.com/images/stars-${starLevel}.png`,
+          className: "fvm-star-level",
+        });
+        console.log("[FVM] star image", starImage);
 
         // STAR LEVEL HEADER
         const header = this.make(
@@ -813,147 +835,11 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         wrapper.append(header);
 
         for (const stickerName in stickersInLevel) {
-          let raffles = stickersInLevel[stickerName];
-          const safeStickerName = stickerName.replace(/[^a-zA-Z0-9\-_.]/g, "");
-
-          const stickerPreview = this.getStickerPreview(stickerName);
-
-          if (!Array.isArray(raffles)) raffles = [raffles];
-
-          const gotItBtn = gotItData?.[starLevel]?.includes(stickerName)
-            ? null
-            : this.make(
-                "button",
-                { className: "got-it-btn", dataset: { keyword: stickerName } },
-                "Got It!",
-              );
-
-          const stickerTitle = this.make(
-            "strong",
-            {
-              style: { color: FVM_Colours.darkOrange, fontSize: "0.8em" },
-            },
-            `${stickerName.toUpperCase()} ${starCount}`,
-          );
-
-          const raffleHeader = this.make(
-            "div",
-            { className: "fvm-raffle-header" },
-            stickerTitle,
-            stickerPreview,
-            gotItBtn,
-          );
-
-          const raffleInner = this.make("div", {
-            style: { padding: "2px 8px" },
-          });
-
-          raffles.forEach((raffle) => {
-            const expires = parseInt(raffle.created_utc) + 86400;
-            const timeRemaining = this.getSecondsRemaining(
-              parseInt(raffle.created_utc),
-            );
-            const isExpired = now > expires;
-            const raffleId = raffle.id || raffle.post_id;
-            const flags = raffle.flags || "";
-            const isEntered = raffle.status === "active";
-
-            let label = isEntered ? this.labels.entered : this.labels.new;
-            let newState = isEntered ? "entered" : "new";
-            let btn = null;
-
-            if (timeRemaining.state === "expired") {
-              newState = "expired";
-              if (raffle.winner.length === 0) {
-                label = this.labels.doneCheck;
-              } else {
-                if (raffle.winner === user) {
-                  label = this.labels.youWon;
-                } else {
-                  label = `Winner: ${raffle.winner} `;
-                  btn = this.make(
-                    "button",
-                    {
-                      className: "fvm-raffle-ok",
-                      dataset: { postid: raffleId, from: "render" },
-                    },
-                    "OK",
-                  );
-                }
-              }
-            }
-
-            const link = this.make(
-              "a",
-              {
-                href: raffle.url,
-                className: "fvm-raffle-link",
-                dataset: {
-                  postid: raffleId,
-                  status: raffle.status,
-                  winner: raffle.winner,
-                  state: newState,
-                },
-              },
-              label,
-            );
-
-            const timer = this.make(
-              "span",
-              {
-                className: "fvm-timer",
-                dataset: {
-                  postid: raffleId,
-                  state: timeRemaining.state,
-                  created: raffle.created_utc,
-                  checked: raffle.winner > "" ? "true" : "false",
-                },
-              },
-              timeRemaining.text,
-            );
-
-            const infoSpan = this.make("span", {
-              className: "pl-5",
-              dataset: {
-                state:
-                  flags.length > 0 || raffle.harvester > 2 ? "flagged" : "ok",
-                role: "info-trigger",
-                postid: raffleId,
-                created: raffle.created_utc,
-                winner: raffle.winner,
-                winner_by: raffle.winner_by || "",
-                author: raffle.author,
-                flags: flags,
-                entrydate: raffle.entry_date_utc,
-                harvester: raffle.harvester,
-              },
-            });
-            infoSpan.innerHTML = this.info_svg;
-
-            const innerDiv = this.make("div", {}, timer, infoSpan);
-            const newRow = this.make(
-              "div",
-              {
-                id: `fvm-${raffleId}`,
-                className: "fvm-raffle-row",
-                dataset: { state: newState },
-              },
-              link,
-              btn,
-              innerDiv,
-            );
-
-            raffleInner.append(newRow);
-          });
-
-          const stickerContainer = this.make(
-            "div",
-            {
-              className: "fvm-raffle-container fvm-shadow-sm",
-              id: `fvm-sticker-${safeStickerName}`,
-            },
-            raffleHeader,
-            raffleInner,
+          const stickerContainer = this.renderSticker(
+            stickerName,
+            stickersInLevel,
+            starImage.cloneNode(true),
+            gotItData?.[starLevel]?.includes(stickerName),
           );
 
           wrapper.append(stickerContainer);
@@ -993,7 +879,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
               className: "got-it-pill",
               dataset: { keyword: "all", stars: starLevel },
             },
-            `${FVM_Emojis.zap} All ✕`,
+            `${FVM_Emojis.explode} All ✕`,
           );
 
           pillsContainer.append(allPill);
@@ -1008,11 +894,164 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       document.getElementById("fvm-popup").style.display = "block";
     },
 
+    //------------ R E N D E R  S T I C K E R ----------
+
+    renderSticker(stickerName, stickersInLevel, starImage, gotIt) {
+      let raffles = stickersInLevel[stickerName];
+      const safeStickerName = stickerName.replace(/[^a-zA-Z0-9\-_.]/g, "");
+
+      const stickerPreview = this.getStickerPreview(stickerName);
+
+      if (!Array.isArray(raffles)) raffles = [raffles];
+
+      const gotItBtn = gotIt
+        ? null
+        : this.make(
+            "button",
+            { className: "got-it-btn", dataset: { keyword: stickerName } },
+            "Got It!",
+          );
+
+      const stickerTitle = this.make(
+        "strong",
+        {
+          style: { color: FVM_Colours.darkOrange, fontSize: "0.9em" },
+        },
+        `${stickerName.toUpperCase()}`,
+      );
+
+      const bundle = this.make(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: "4px" } },
+        stickerPreview,
+        stickerTitle,
+      );
+      const raffleHeader = this.make(
+        "div",
+        { className: "fvm-raffle-header" },
+        bundle,
+        starImage,
+        gotItBtn,
+      );
+
+      const raffleInner = this.make("div", {
+        style: { padding: "2px 8px" },
+      });
+
+      raffles.forEach((raffle) => {
+        const newRow = this.renderRow(raffle);
+        raffleInner.append(newRow);
+      });
+
+      return this.make(
+        "div",
+        {
+          className: "fvm-raffle-container fvm-shadow-sm",
+          id: `fvm-sticker-${safeStickerName}`,
+        },
+        raffleHeader,
+        raffleInner,
+      );
+    },
+
+    renderRow(raffle) {
+      const timeRemaining = this.getSecondsRemaining(
+        parseInt(raffle.created_utc),
+      );
+
+      const raffleId = raffle.id || raffle.post_id;
+      const flags = raffle.flags || "";
+      const isEntered = raffle.status === "active";
+      const user = localStorage.getItem("fvm_user_id");
+
+      let label = isEntered ? this.labels.entered : this.labels.new;
+      let newState = isEntered ? "entered" : "new";
+      let btn = null;
+
+      if (timeRemaining.state === "expired") {
+        newState = "expired";
+        if (raffle.winner.length === 0) {
+          label = this.labels.doneCheck;
+        } else {
+          if (raffle.winner === user) {
+            label = this.labels.youWon;
+          } else {
+            label = `Winner: ${raffle.winner} `;
+            btn = this.make(
+              "button",
+              {
+                className: "fvm-raffle-ok",
+                dataset: { postid: raffleId, from: "render" },
+              },
+              "OK",
+            );
+          }
+        }
+      }
+
+      const link = this.make(
+        "a",
+        {
+          href: raffle.url,
+          className: "fvm-raffle-link",
+          dataset: {
+            postid: raffleId,
+            status: raffle.status,
+            winner: raffle.winner,
+            state: newState,
+          },
+        },
+        label,
+      );
+
+      const timer = this.make(
+        "span",
+        {
+          className: "fvm-timer",
+          dataset: {
+            postid: raffleId,
+            state: timeRemaining.state,
+            created: raffle.created_utc,
+            checked: raffle.winner > "" ? "true" : "false",
+          },
+        },
+        timeRemaining.text,
+      );
+
+      const infoSpan = this.make("span", {
+        className: "pl-5",
+        dataset: {
+          state: flags.length > 0 || raffle.harvester > 2 ? "flagged" : "ok",
+          role: "info-trigger",
+          postid: raffleId,
+          created: raffle.created_utc,
+          winner: raffle.winner,
+          winner_by: raffle.winner_by || "",
+          author: raffle.author,
+          flags: flags,
+          entrydate: raffle.entry_date_utc,
+          harvester: raffle.harvester,
+        },
+      });
+      infoSpan.innerHTML = this.info_svg;
+
+      const innerDiv = this.make("div", {}, timer, infoSpan);
+      const newRow = this.make(
+        "div",
+        {
+          id: `fvm-${raffleId}`,
+          className: "fvm-raffle-row",
+          dataset: { state: newState },
+        },
+        link,
+        btn,
+        innerDiv,
+      );
+      return newRow;
+    },
+
     // used by render()
     getStickerPreview(stickerName) {
-      console.info(
-        `[FVM] Stickername for ${stickerName}: ${this.getStickerImage(stickerName)}`,
-      );
       const stickerImagePath = this.getStickerImage(stickerName);
 
       if (!stickerImagePath) return null;
