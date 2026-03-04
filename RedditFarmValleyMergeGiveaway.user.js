@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.32
+// @version      3.33
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -128,8 +128,8 @@
           ...data,
         }).toString();
       }
-      //console.log(["FVM_API.sendToServer:", method, url]);
-      //console.log(["FVM_API.sendToServer:", body]);
+      console.log(["FVM_API.sendToServer:", method, url]);
+      console.log(["FVM_API.sendToServer:", body]);
 
       return this.fetch({ method, url, headers, data: body });
     },
@@ -493,6 +493,7 @@
       "https://playfmv-94o1jc-0-3-31-webview.devvit.net/raffle/stickers/stickerbook-default/",
     init() {
       console.info("FVM_UI: Initializing...");
+      this.currentView = this.getView();
       this.injectStyles();
       this.getStickerImages();
       this.drawPopup();
@@ -592,56 +593,187 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
 
     drawPopup() {
       if (document.getElementById("fvm-popup")) return;
-      const div = this.make("div", { id: "fvm-popup" });
-      //div.id = "fvm-popup";
-      div.innerHTML = `
-        <div id="fvm-header" style="gap: 2px;'>
-          <span style="padding-top: .5em;">Find Raffles</span>
-          <div class="fvm-header-inset">
-          <button id="fvm-view-stars" class="fvm-view-btn" title='Show Raffles By Stars'><img src='https://fvm.itamer.com/images/icon-stars2.png'></button>  
-          <button id="fvm-view-page" class="fvm-view-btn" title='Show Raffles By Page'><img src='https://fvm.itamer.com/images/icon-grid.png'></button>
-          </div>
-          <div class="fvm-header-inset">
-            <span id="fvm-jump-expired">${FVM_Emojis.flag}</span>
-            <span id="fvm-jump-next">${FVM_Emojis.play}</span>
-            <span id="fvm-jump-oldest">${FVM_Emojis.hourglass}</span>
-          <button id="fvm-close" title='Close'>×</button>
-          </div>
-        </div>
-        <div id="fvm-body">Loading...</div>
-        <div id="fvm-footer">
-          <div style="display: flex; flex-direction: column; align-items: center; line-height: 1;">
-            <img src="https://fvm.itamer.com/buynzmade.webp" alt="Buy NZ Made" style="height:24px; margin-bottom: 2px;" />
-            <span style="font-size: 8px; color: #999; font-family: sans-serif;">${FVM_SCRIPT_VERSION}</span>
-          </div>
-          <a href="https://www.reddit.com/chat/user_id/itamer" target="_blank" title="Need Help? Chat with me" style="text-decoration: none; padding: 0 5px; border-radius: 4px; background-color: white;">💬</a>
-          <button id="fvm-refresh" style="flex:1; cursor:pointer;">Refresh</button>
-          <button id="fvm-clear" style="flex:1; cursor:pointer;">Logout</button>
-        </div>
-      `;
+
+      // View buttons
+      const btnStars = this.make(
+        "button",
+        {
+          id: "fvm-view-stars",
+          className:
+            "fvm-view-btn" + (this.currentView === "stars" ? " active" : ""),
+          title: "Show Raffles By Stars",
+          onclick: () => this.setView("stars"),
+        },
+        this.make("img", {
+          src: "https://fvm.itamer.com/images/icon-stars2.png",
+        }),
+      );
+
+      const btnPage = this.make(
+        "button",
+        {
+          id: "fvm-view-page",
+          className:
+            "fvm-view-btn" + (this.currentView === "page" ? " active" : ""),
+          title: "Show Raffles By Page",
+          onclick: () => this.setView("page"),
+        },
+        this.make("img", {
+          src: "https://fvm.itamer.com/images/icon-grid.png",
+        }),
+      );
+
+      const viewInset = this.make(
+        "div",
+        { className: "fvm-header-inset" },
+        btnStars,
+        btnPage,
+      );
+
+      // Nav buttons
+      const jumpExpired = this.make(
+        "span",
+        {
+          id: "fvm-jump-expired",
+          onclick: () => this.jumpToRow("fvm-jump-expired", "expired"),
+        },
+        FVM_Emojis.flag,
+      );
+
+      const jumpNext = this.make(
+        "span",
+        {
+          id: "fvm-jump-next",
+          onclick: () => this.jumpToRow("fvm-jump-next", "new"),
+        },
+        FVM_Emojis.play,
+      );
+
+      const jumpOldest = this.make(
+        "span",
+        {
+          id: "fvm-jump-oldest",
+          onclick: () => this.jumpToRow("fvm-jump-oldest", "new"),
+        },
+        FVM_Emojis.hourglass,
+      );
+
+      const btnClose = this.make(
+        "button",
+        {
+          id: "fvm-close",
+          title: "Close",
+          onclick: () => (div.style.display = "none"),
+        },
+        "×",
+      );
+
+      const navInset = this.make(
+        "div",
+        { className: "fvm-header-inset" },
+        jumpExpired,
+        jumpNext,
+        jumpOldest,
+        btnClose,
+      );
+
+      const header = this.make(
+        "div",
+        { id: "fvm-header", style: { gap: "2px" } },
+        this.make("span", { style: { paddingTop: ".5em" } }, "Find Raffles"),
+        viewInset,
+        navInset,
+      );
+
+      // Footer
+      const logo = this.make(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            lineHeight: "1",
+          },
+        },
+        this.make("img", {
+          src: "https://fvm.itamer.com/buynzmade.webp",
+          alt: "Buy NZ Made",
+          style: { height: "24px", marginBottom: "2px" },
+        }),
+        this.make(
+          "span",
+          {
+            style: {
+              fontSize: "8px",
+              color: "#999",
+              fontFamily: "sans-serif",
+            },
+          },
+          FVM_SCRIPT_VERSION,
+        ),
+      );
+
+      const chatLink = this.make(
+        "a",
+        {
+          href: "https://www.reddit.com/chat/user_id/itamer",
+          target: "_blank",
+          title: "Need Help? Chat with me",
+          style: {
+            textDecoration: "none",
+            padding: "0 5px",
+            borderRadius: "4px",
+            backgroundColor: "white",
+          },
+        },
+        "💬",
+      );
+
+      const btnRefresh = this.make(
+        "button",
+        {
+          id: "fvm-refresh",
+          style: { flex: "1", cursor: "pointer" },
+          onclick: () => {
+            FVM_Importer.runInitialImport();
+            this.refreshPopup();
+          },
+        },
+        "Refresh",
+      );
+
+      const btnClear = this.make(
+        "button",
+        {
+          id: "fvm-clear",
+          style: { flex: "1", cursor: "pointer" },
+          onclick: () => {
+            localStorage.removeItem("fvm_user_id");
+            this.refreshPopup();
+          },
+        },
+        "Logout",
+      );
+
+      const footer = this.make(
+        "div",
+        { id: "fvm-footer" },
+        logo,
+        chatLink,
+        btnRefresh,
+        btnClear,
+      );
+
+      const div = this.make(
+        "div",
+        { id: "fvm-popup" },
+        header,
+        this.make("div", { id: "fvm-body" }, "Loading..."),
+        footer,
+      );
+
       document.body.appendChild(div);
-
-      document.getElementById("fvm-close").onclick = () =>
-        (div.style.display = "none");
-      document.getElementById("fvm-clear").onclick = () => {
-        localStorage.removeItem("fvm_user_id");
-        this.refreshPopup();
-      };
-      document.getElementById("fvm-refresh").onclick = () => {
-        FVM_Importer.runInitialImport();
-        this.refreshPopup();
-      };
-      document.getElementById("fvm-jump-expired").onclick = () =>
-        this.jumpToRow("fvm-jump-expired", "expired");
-      document.getElementById("fvm-jump-next").onclick = () =>
-        this.jumpToRow("fvm-jump-next", "new");
-      document.getElementById("fvm-jump-oldest").onclick = () =>
-        this.jumpToRow("fvm-jump-oldest", "new");
-
-      document.getElementById("fvm-view-stars").onclick = () =>
-        this.setView("stars");
-      document.getElementById("fvm-view-page").onclick = () =>
-        this.setView("page");
     },
 
     make(tag, props = {}, ...children) {
@@ -661,6 +793,10 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       return node;
     },
 
+    getView() {
+      return localStorage.getItem("fvm_view");
+    },
+
     setView(view) {
       if (this.currentView === view) return; // already active, do nothing
       this.currentView = view;
@@ -674,7 +810,6 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
 
     async getStickerImages() {
       this.stickerImages = await FVM_API.sendToServer("stickers", {}, "GET");
-      console.log("[FVM] Stickers", this.stickerImages);
     },
 
     getStickerImage(keyword) {
@@ -834,13 +969,14 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
           { user, view: this.currentView },
           "GET",
         );
+        console.log("[FVM] Render Type", this.currentView);
         if (this.currentView === "stars") {
           this.render(feed, gotIts);
         } else {
           this.renderPageView(feed, gotIts);
         }
       } catch (e) {
-        console.error("Popup Load Failure:", e); // Log the actual error
+        console.error("[FVM] Popup Load Failure:", e); // Log the actual error
         body.innerHTML = "Error loading data: " + e.message;
         document.getElementById("fvm-popup").style.display = "block";
       }
@@ -857,73 +993,78 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       }
 
       const wrapper = this.make("div", {});
-
-      Object.entries(groupedData).forEach(([starLevel, stickersInLevel]) => {
-        const starImage = this.make("img", {
-          src: `https://fvm.itamer.com/images/stars-${starLevel}.png`,
-          className: "fvm-star-level",
-        });
-
-        // STAR LEVEL HEADER
-        const header = this.make(
-          "div",
-          { className: "fvm-star-level-header" },
-          `${starLevel} Star Raffles`,
-        );
-        wrapper.append(header);
-
-        for (const stickerName in stickersInLevel) {
-          const stickerContainer = this.renderSticker(
-            stickerName,
-            stickersInLevel,
-            starImage.cloneNode(true),
-            gotItData?.[starLevel]?.includes(stickerName),
-          );
-
-          wrapper.append(stickerContainer);
-        }
-
-        // PILLS for this star level
-        if (gotItData?.[starLevel]) {
-          const pillsContainer = this.make("div", {
-            className: "fvm-gotits-container",
+      console.log(
+        "[FVM] groupedData for stars feed",
+        Object.entries(groupedData),
+      );
+      Object.entries(groupedData)
+        .reverse()
+        .forEach(([starLevel, stickersInLevel]) => {
+          const starImage = this.make("img", {
+            src: `https://fvm.itamer.com/images/stars-${starLevel}.png`,
+            className: "fvm-star-level",
           });
 
-          const label = this.make(
-            "span",
-            {
-              style: { fontSize: "0.75em", color: "#888", width: "100%" },
-            },
-            "Collected Stickers (click to reactivate):",
+          // STAR LEVEL HEADER
+          const header = this.make(
+            "div",
+            { className: "fvm-star-level-header" },
+            `${starLevel} Star Raffles`,
           );
+          wrapper.append(header);
 
-          pillsContainer.append(label);
+          for (const stickerName in stickersInLevel) {
+            const stickerContainer = this.renderSticker(
+              stickerName,
+              stickersInLevel,
+              starImage.cloneNode(true),
+              gotItData?.[starLevel]?.includes(stickerName),
+            );
 
-          gotItData[starLevel].forEach((pillName) => {
-            const pill = this.make(
+            wrapper.append(stickerContainer);
+          }
+
+          // PILLS for this star level
+          if (gotItData?.[starLevel]) {
+            const pillsContainer = this.make("div", {
+              className: "fvm-gotits-container",
+            });
+
+            const label = this.make(
+              "span",
+              {
+                style: { fontSize: "0.75em", color: "#888", width: "100%" },
+              },
+              "Collected Stickers (click to reactivate):",
+            );
+
+            pillsContainer.append(label);
+
+            gotItData[starLevel].forEach((pillName) => {
+              const pill = this.make(
+                "span",
+                {
+                  className: "got-it-pill",
+                  dataset: { keyword: pillName, stars: starLevel },
+                },
+                `${pillName} ✕`,
+              );
+              pillsContainer.append(pill);
+            });
+
+            const allPill = this.make(
               "span",
               {
                 className: "got-it-pill",
-                dataset: { keyword: pillName, stars: starLevel },
+                dataset: { keyword: "all", stars: starLevel },
               },
-              `${pillName} ✕`,
+              `${FVM_Emojis.explode} All ✕`,
             );
-            pillsContainer.append(pill);
-          });
 
-          const allPill = this.make(
-            "span",
-            {
-              className: "got-it-pill",
-              dataset: { keyword: "all", stars: starLevel },
-            },
-            `${FVM_Emojis.explode} All ✕`,
-          );
-
-          pillsContainer.append(allPill);
-          wrapper.append(pillsContainer);
-        }
-      });
+            pillsContainer.append(allPill);
+            wrapper.append(pillsContainer);
+          }
+        });
 
       body.replaceChildren(wrapper);
 
@@ -956,17 +1097,6 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         );
 
         wrapper.append(header);
-
-        // if (!stickersOnPage || Object.keys(stickersOnPage).length === 0) {
-        //   wrapper.append(
-        //     this.make(
-        //       "div",
-        //       { style: { color: "#888", padding: "4px 8px" } },
-        //       "No raffles on this page.",
-        //     ),
-        //   );
-        //   return;
-        // }
 
         for (const [stickerName, raffles] of Object.entries(stickersOnPage)) {
           const stickersInLevel = { [stickerName]: raffles };
