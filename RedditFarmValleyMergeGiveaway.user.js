@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.31
+// @version      3.32
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -14,6 +14,10 @@
 // @grant        GM_info
 // @run-at       document-start
 // ==/UserScript==
+
+// todo build feed by page
+// api built
+// what=feed-by-page
 
 (function () {
   ("use strict");
@@ -37,6 +41,7 @@
     explode: "💥",
     hourglass: "⌛",
     redflag: "🚩",
+    gift: "🎁",
   };
 
   const FVM_Colours = {
@@ -520,7 +525,7 @@
         #fvm-close {background:none; border:none; color: ${FVM_Colours.darkOrange}; cursor:pointer; font-size:18px;}
         #fvm-footer {padding: 10px; border-top: 1px solid #eee; display: flex; gap: 8px;align-items: center;}
         #fvm-footer a, #fvm-footer span { background-color: transparent !important; line-height: 1; /* Prevents extra vertical space that can cause background bleeding */ display: inline-flex; align-items: center; mix-blend-mode: multiply; }
-        #fvm-star-level-header {margin: 10px 0 5px 0; font-weight: bold; color: #444; border-left: 4px solid ${FVM_Colours.darkOrange}; padding-left: 8px;}
+        .fvm-star-level-header {margin: 10px 0 5px 0; font-weight: bold; color: #444; border-left: 4px solid ${FVM_Colours.darkOrange}; padding-left: 8px;}
         .fvm-raffle-container {margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; overflow: hidden;}
         .fvm-raffle-header {display:flex; justify-content:space-between; background:#f8f8f8; padding: 4px 10px; align-items: center; border-bottom: 1px solid #eee;}
         .fvm-timer {font-size: 0.85em; color: #666; font-family: monospace;}
@@ -567,6 +572,11 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
 .fvm-sticker-popover { position: absolute; z-index: 100002; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
 .fvm-sticker-popover img { display: block; width: 120px; height: 150px; object-fit: contain; margin-bottom: 0;}
 .fvm-star-level { height: 30px; margin: 2px; }
+.fvm-view-btn { cursor: pointer; padding: 3px; margin: 3px 0 3px 0; background-color: ${FVM_Colours.yellow};border-color: ${FVM_Colours.orange}; border-radius: 3px; opacity: 0.5; align-self: center; height: 27px}
+.fvm-view-btn:hover { opacity: 1; }
+.fvm-view-btn.active { opacity: 1; background: rgba(255,255,255,0.3); }
+.fvm-view-btn img { margin: 0; height: 20px; width: 20px; }
+.fvm-header-inset { display: flex; align-items: center; gap: 10px; background-color: #f9f9f9; border-radius: 4px; font-size: 16px; padding: 0 4px;}
       `;
 
       document.head.appendChild(style);
@@ -585,9 +595,13 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       const div = this.make("div", { id: "fvm-popup" });
       //div.id = "fvm-popup";
       div.innerHTML = `
-        <div id="fvm-header">
-          <span style="padding-top: .5em;">🎁 Find Raffles</span>
-          <div style="display: flex; align-items: center; gap: 10px;background-color: #f9f9f9; border-radius: 4px;  padding: 0 5px; font-size: 16px;">
+        <div id="fvm-header" style="gap: 2px;'>
+          <span style="padding-top: .5em;">Find Raffles</span>
+          <div class="fvm-header-inset">
+          <button id="fvm-view-stars" class="fvm-view-btn" title='Show Raffles By Stars'><img src='https://fvm.itamer.com/images/icon-stars2.png'></button>  
+          <button id="fvm-view-page" class="fvm-view-btn" title='Show Raffles By Page'><img src='https://fvm.itamer.com/images/icon-grid.png'></button>
+          </div>
+          <div class="fvm-header-inset">
             <span id="fvm-jump-expired">${FVM_Emojis.flag}</span>
             <span id="fvm-jump-next">${FVM_Emojis.play}</span>
             <span id="fvm-jump-oldest">${FVM_Emojis.hourglass}</span>
@@ -623,6 +637,11 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         this.jumpToRow("fvm-jump-next", "new");
       document.getElementById("fvm-jump-oldest").onclick = () =>
         this.jumpToRow("fvm-jump-oldest", "new");
+
+      document.getElementById("fvm-view-stars").onclick = () =>
+        this.setView("stars");
+      document.getElementById("fvm-view-page").onclick = () =>
+        this.setView("page");
     },
 
     make(tag, props = {}, ...children) {
@@ -640,6 +659,17 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         );
       }
       return node;
+    },
+
+    setView(view) {
+      if (this.currentView === view) return; // already active, do nothing
+      this.currentView = view;
+      localStorage.setItem("fvm_view", view);
+      document
+        .querySelectorAll(".fvm-view-btn")
+        .forEach((b) => b.classList.remove("active"));
+      document.getElementById(`fvm-view-${view}`).classList.add("active");
+      this.refreshPopup(); // disposes and rebuilds
     },
 
     async getStickerImages() {
@@ -794,9 +824,21 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       body.style.display = "block";
       body.innerHTML = "Updating...";
       try {
-        const feed = await FVM_API.sendToServer("feed", { user }, "GET");
-        const gotIts = await FVM_API.sendToServer("gotits", { user }, "GET");
-        this.render(feed, gotIts);
+        const feed = await FVM_API.sendToServer(
+          "feed",
+          { user, view: this.currentView },
+          "GET",
+        );
+        const gotIts = await FVM_API.sendToServer(
+          "gotits",
+          { user, view: this.currentView },
+          "GET",
+        );
+        if (this.currentView === "stars") {
+          this.render(feed, gotIts);
+        } else {
+          this.renderPageView(feed, gotIts);
+        }
       } catch (e) {
         console.error("Popup Load Failure:", e); // Log the actual error
         body.innerHTML = "Error loading data: " + e.message;
@@ -814,22 +856,18 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         return;
       }
 
-      const sortedStars = Object.keys(groupedData).sort((a, b) => b - a);
       const wrapper = this.make("div", {});
 
-      sortedStars.forEach((starLevel) => {
-        const stickersInLevel = groupedData[starLevel];
-        //const starCount = "⭐".repeat(parseInt(starLevel));
+      Object.entries(groupedData).forEach(([starLevel, stickersInLevel]) => {
         const starImage = this.make("img", {
           src: `https://fvm.itamer.com/images/stars-${starLevel}.png`,
           className: "fvm-star-level",
         });
-        console.log("[FVM] star image", starImage);
 
         // STAR LEVEL HEADER
         const header = this.make(
           "div",
-          { id: "fvm-star-level-header" },
+          { className: "fvm-star-level-header" },
           `${starLevel} Star Raffles`,
         );
         wrapper.append(header);
@@ -889,6 +927,104 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
 
       body.replaceChildren(wrapper);
 
+      this.updateTimers();
+      this.attachEvents(user);
+      document.getElementById("fvm-popup").style.display = "block";
+    },
+
+    //------------ R E N D E R  P A G E  V I E W ----------
+
+    renderPageView(groupedData, gotItData) {
+      const body = document.getElementById("fvm-body");
+      const user = localStorage.getItem("fvm_user_id");
+
+      if (!groupedData || Object.keys(groupedData).length === 0) {
+        body.textContent = "No active raffles found.";
+        return;
+      }
+
+      const wrapper = this.make("div", {});
+
+      Object.entries(groupedData).forEach(([pageNum, stickersOnPage]) => {
+        const header = this.make(
+          "div",
+          {
+            id: `fvm-page-header-${pageNum}`,
+            className: "fvm-star-level-header",
+          },
+          `Page ${pageNum}`,
+        );
+
+        wrapper.append(header);
+
+        // if (!stickersOnPage || Object.keys(stickersOnPage).length === 0) {
+        //   wrapper.append(
+        //     this.make(
+        //       "div",
+        //       { style: { color: "#888", padding: "4px 8px" } },
+        //       "No raffles on this page.",
+        //     ),
+        //   );
+        //   return;
+        // }
+
+        for (const [stickerName, raffles] of Object.entries(stickersOnPage)) {
+          const stickersInLevel = { [stickerName]: raffles };
+          const starCount = raffles[0]?.stars ?? 0;
+          const starImage = this.make("img", {
+            src: `https://fvm.itamer.com/images/stars-${starCount}.png`,
+            className: "fvm-star-level",
+          });
+          const stickerContainer = this.renderSticker(
+            stickerName,
+            stickersInLevel,
+            starImage,
+            gotItData?.[pageNum]?.includes(stickerName),
+          );
+          wrapper.append(stickerContainer);
+        }
+
+        // PILLS for this page
+        if (gotItData?.[pageNum]) {
+          const pillsContainer = this.make("div", {
+            className: "fvm-gotits-container",
+          });
+
+          const label = this.make(
+            "span",
+            {
+              style: { fontSize: "0.75em", color: "#888", width: "100%" },
+            },
+            "Collected Stickers (click to reactivate):",
+          );
+          pillsContainer.append(label);
+
+          gotItData[pageNum].forEach((pillName) => {
+            const pill = this.make(
+              "span",
+              {
+                className: "got-it-pill",
+                dataset: { keyword: pillName, page: pageNum },
+              },
+              `${pillName} ✕`,
+            );
+            pillsContainer.append(pill);
+          });
+
+          const allPill = this.make(
+            "span",
+            {
+              className: "got-it-pill",
+              dataset: { keyword: "all", page: pageNum },
+            },
+            `${FVM_Emojis.explode} All ✕`,
+          );
+          pillsContainer.append(allPill);
+          wrapper.append(pillsContainer);
+        }
+      });
+
+      body.replaceChildren(wrapper);
       this.updateTimers();
       this.attachEvents(user);
       document.getElementById("fvm-popup").style.display = "block";
@@ -1327,13 +1463,14 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
           const what =
             keyword === "all" ? "delete_all_keywords" : "delete_keyword";
           const stars = target.getAttribute("data-stars");
+          const page = target.getAttribute("data-page");
 
           console.log("Reactivating keyword:", keyword, what);
           //if (confirm(`Reactivate tracking for '${keyword}'?`)) {
           try {
             await FVM_API.sendToServer(
               what,
-              { user: user, keyword: keyword, stars: stars },
+              { user: user, keyword: keyword, stars: stars, page: page },
               "POST",
             );
             this.refreshPopup(); // Reload UI to show raffles again
