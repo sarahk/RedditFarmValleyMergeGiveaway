@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.33
+// @version      3.34
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -14,10 +14,6 @@
 // @grant        GM_info
 // @run-at       document-start
 // ==/UserScript==
-
-// todo build feed by page
-// api built
-// what=feed-by-page
 
 (function () {
   ("use strict");
@@ -551,23 +547,8 @@
 span[data-role="info-trigger"][data-state="ok"] { color: ${FVM_Colours.purple}; }
 span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}; }
 .pl-5 { padding-left: 5px !important; }
-.fvm_modal_overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
-  z-index: 999999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.fvm_modal {
-  background: #fff;
-  padding: 18px;
-  border-radius: 8px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.25);
-  max-width: 320px;
-}
+.fvm_modal_overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 999999; display: flex; align-items: center; justify-content: center; }
+.fvm_modal { background: #fff; padding: 18px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); max-width: 320px;}
 .fvm-sticker-btn { background: none; border: none; border-radius: 0; cursor: pointer; font-size: 0.9em; padding: 0 3px; opacity: 0.75; line-height: 1; }
 .fvm-sticker-btn:hover { opacity: 1; }
 .fvm-sticker-popover { position: absolute; z-index: 100002; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
@@ -814,7 +795,9 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
 
     getStickerImage(keyword) {
       const stickerName = keyword.toLowerCase();
-      return this.STICKER_PATH + this.stickerImages?.[stickerName];
+      const sticker_id = this.stickerImages?.[stickerName];
+      if (!sticker_id) return null;
+      return this.STICKER_PATH + sticker_id;
     },
 
     getSecondsRemaining(createdUtc) {
@@ -1320,6 +1303,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
     getStickerPreview(stickerName) {
       const stickerImagePath = this.getStickerImage(stickerName);
 
+      console.log(stickerName, stickerImagePath);
       if (!stickerImagePath) return null;
 
       const stickerImage = this.make("img", {
@@ -1600,7 +1584,13 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
           try {
             await FVM_API.sendToServer(
               what,
-              { user: user, keyword: keyword, stars: stars, page: page },
+              {
+                user: user,
+                view: this.currentView,
+                keyword: keyword,
+                stars: stars,
+                page: page,
+              },
               "POST",
             );
             this.refreshPopup(); // Reload UI to show raffles again
