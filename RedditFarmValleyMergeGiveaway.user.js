@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.35
+// @version      3.36
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -492,7 +492,7 @@
     STICKER_PATH:
       "https://playfmv-94o1jc-0-3-31-webview.devvit.net/raffle/stickers/stickerbook-default/",
     STICKER_PATH_ALT:
-      "https://playfmv-94o1jc-0-3-35-webview.devvit.net/raffle/stickers/stickerbook-2/sticker_091.webp",
+      "https://playfmv-94o1jc-0-3-35-webview.devvit.net/raffle/stickers/stickerbook-2/",
 
     init() {
       console.info("FVM_UI: Initializing...");
