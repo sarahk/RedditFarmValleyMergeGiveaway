@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.36
+// @version      3.37
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -12,6 +12,9 @@
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @grant        GM_info
+// @grant        GM.getValue
+// @grant        GM.setValue
+// @grant        GM.deleteValue
 // @run-at       document-start
 // ==/UserScript==
 
@@ -68,9 +71,9 @@
       return new Promise((resolve, reject) => {
         // Use the underscore version if available for better compatibility
         const xhr =
-          typeof GM_xmlhttpRequest !== "undefined"
-            ? GM_xmlhttpRequest
-            : GM.xmlHttpRequest;
+          typeof GM !== "undefined" && GM.xmlHttpRequest
+            ? GM.xmlHttpRequest.bind(GM)
+            : GM_xmlhttpRequest;
 
         //console.log("FVM_API.fetch called with options:", options);
 
@@ -110,7 +113,7 @@
       let url = this.target;
       let body = null;
       let headers = { "X-Api-Key": this.key };
-      const username = localStorage.getItem("fvm_user_id");
+      const username = await FVM_Storage.get("fvm_user_id");
 
       if (isGet) {
         url += `?what=${action}&username=${username}&${new URLSearchParams(data).toString()}`;
@@ -157,7 +160,7 @@
     },
 
     async runHourlyImport() {
-      const lastRun = localStorage.getItem("fvm_last_hourly");
+      const lastRun = await FVM_Storage.get("fvm_last_hourly");
       const now = Date.now();
 
       if (!lastRun || now - parseInt(lastRun) > 3600000) {
@@ -172,7 +175,7 @@
               console.info(`FVM_Importer: Imported keyword '${kw}'`);
             }
           }
-          localStorage.setItem("fvm_last_hourly", now.toString());
+          await FVM_Storage.set("fvm_last_hourly", now.toString());
         } catch (e) {
           console.error("Hourly task failed", e);
         }
@@ -227,7 +230,7 @@
 
                 // Find the parent cell to update the display
                 const youWon =
-                  info.winner === localStorage.getItem("fvm_user_id");
+                  info.winner === (await FVM_Storage.get("fvm_user_id"));
                 FVM_UI.setLinkText(
                   el,
                   youWon ? FVM_UI.labels.youWon : `Winner: ${info.winner}`,
@@ -489,14 +492,14 @@
   //
   //https://playfmv-94o1jc-0-3-31-webview.devvit.net/raffle/stickers/stickerbook-default/sticker_098.webp
   const FVM_UI = {
-    STICKER_PATH:
-      "https://playfmv-94o1jc-0-3-31-webview.devvit.net/raffle/stickers/stickerbook-default/",
     STICKER_PATH_ALT:
+      "https://playfmv-94o1jc-0-3-31-webview.devvit.net/raffle/stickers/stickerbook-default/",
+    STICKER_PATH:
       "https://playfmv-94o1jc-0-3-35-webview.devvit.net/raffle/stickers/stickerbook-2/",
 
-    init() {
+    async init() {
       console.info("FVM_UI: Initializing...");
-      this.currentView = this.getView();
+      this.currentView = await this.getView();
       this.injectStyles();
       this.getStickerImages();
       this.drawPopup();
@@ -737,7 +740,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
           id: "fvm-clear",
           style: { flex: "1", cursor: "pointer" },
           onclick: () => {
-            localStorage.removeItem("fvm_user_id");
+            FVM_Storage.remove("fvm_user_id");
             this.refreshPopup();
           },
         },
@@ -781,14 +784,14 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       return node;
     },
 
-    getView() {
-      return localStorage.getItem("fvm_view");
+    async getView() {
+      return FVM_Storage.get("fvm_view");
     },
 
-    setView(view) {
+    async setView(view) {
       if (this.currentView === view) return; // already active, do nothing
       this.currentView = view;
-      localStorage.setItem("fvm_view", view);
+      await FVM_Storage.set("fvm_view", view);
       document
         .querySelectorAll(".fvm-view-btn")
         .forEach((b) => b.classList.remove("active"));
@@ -925,7 +928,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
     },
 
     async refreshPopup() {
-      const user = localStorage.getItem("fvm_user_id");
+      const user = await FVM_Storage.get("fvm_user_id");
       const body = document.getElementById("fvm-body");
       const defaultName = this.getRedditUsername();
       console.log("[FVM] default Name", defaultName);
@@ -939,7 +942,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         document.getElementById("fvm-save-btn").onclick = () => {
           const val = document.getElementById("fvm-user-in").value.trim();
           if (val) {
-            localStorage.setItem("fvm_user_id", val);
+            FVM_Storage.set("fvm_user_id", val);
             this.refreshPopup();
           }
         };
@@ -972,9 +975,9 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       }
     },
 
-    render(groupedData, gotItData) {
+    async render(groupedData, gotItData) {
       const body = document.getElementById("fvm-body");
-      const user = localStorage.getItem("fvm_user_id");
+      const user = await FVM_Storage.get("fvm_user_id");
       const now = Math.floor(Date.now() / 1000);
 
       if (!groupedData || Object.keys(groupedData).length === 0) {
@@ -987,74 +990,72 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         "[FVM] groupedData for stars feed",
         Object.entries(groupedData),
       );
-      Object.entries(groupedData)
-        .reverse()
-        .forEach(([starLevel, stickersInLevel]) => {
-          const starImage = this.make("img", {
-            src: `https://fvm.itamer.com/images/stars-${starLevel}.png`,
-            className: "fvm-star-level",
+      for (const [starLevel, stickersInLevel] of Object.entries(
+        groupedData,
+      ).reverse()) {
+        const starImage = this.make("img", {
+          src: `https://fvm.itamer.com/images/stars-${starLevel}.png`,
+          className: "fvm-star-level",
+        });
+
+        const header = this.make(
+          "div",
+          { className: "fvm-star-level-header" },
+          `${starLevel} Star Raffles`,
+        );
+        wrapper.append(header);
+
+        for (const stickerName in stickersInLevel) {
+          const stickerContainer = await this.renderSticker(
+            stickerName,
+            stickersInLevel,
+            starImage.cloneNode(true),
+            gotItData?.[starLevel]?.includes(stickerName),
+          );
+          wrapper.append(stickerContainer);
+        }
+
+        // PILLS for this star level
+        if (gotItData?.[starLevel]) {
+          const pillsContainer = this.make("div", {
+            className: "fvm-gotits-container",
           });
 
-          // STAR LEVEL HEADER
-          const header = this.make(
-            "div",
-            { className: "fvm-star-level-header" },
-            `${starLevel} Star Raffles`,
+          const label = this.make(
+            "span",
+            {
+              style: { fontSize: "0.75em", color: "#888", width: "100%" },
+            },
+            "Collected Stickers (click to reactivate):",
           );
-          wrapper.append(header);
 
-          for (const stickerName in stickersInLevel) {
-            const stickerContainer = this.renderSticker(
-              stickerName,
-              stickersInLevel,
-              starImage.cloneNode(true),
-              gotItData?.[starLevel]?.includes(stickerName),
-            );
+          pillsContainer.append(label);
 
-            wrapper.append(stickerContainer);
-          }
-
-          // PILLS for this star level
-          if (gotItData?.[starLevel]) {
-            const pillsContainer = this.make("div", {
-              className: "fvm-gotits-container",
-            });
-
-            const label = this.make(
-              "span",
-              {
-                style: { fontSize: "0.75em", color: "#888", width: "100%" },
-              },
-              "Collected Stickers (click to reactivate):",
-            );
-
-            pillsContainer.append(label);
-
-            gotItData[starLevel].forEach((pillName) => {
-              const pill = this.make(
-                "span",
-                {
-                  className: "got-it-pill",
-                  dataset: { keyword: pillName, stars: starLevel },
-                },
-                `${pillName} ✕`,
-              );
-              pillsContainer.append(pill);
-            });
-
-            const allPill = this.make(
+          gotItData[starLevel].forEach((pillName) => {
+            const pill = this.make(
               "span",
               {
                 className: "got-it-pill",
-                dataset: { keyword: "all", stars: starLevel },
+                dataset: { keyword: pillName, stars: starLevel },
               },
-              `${FVM_Emojis.explode} All ✕`,
+              `${pillName} ✕`,
             );
+            pillsContainer.append(pill);
+          });
 
-            pillsContainer.append(allPill);
-            wrapper.append(pillsContainer);
-          }
-        });
+          const allPill = this.make(
+            "span",
+            {
+              className: "got-it-pill",
+              dataset: { keyword: "all", stars: starLevel },
+            },
+            `${FVM_Emojis.explode} All ✕`,
+          );
+
+          pillsContainer.append(allPill);
+          wrapper.append(pillsContainer);
+        }
+      }
 
       body.replaceChildren(wrapper);
 
@@ -1065,9 +1066,9 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
 
     //------------ R E N D E R  P A G E  V I E W ----------
 
-    renderPageView(groupedData, gotItData) {
+    async renderPageView(groupedData, gotItData) {
       const body = document.getElementById("fvm-body");
-      const user = localStorage.getItem("fvm_user_id");
+      const user = await FVM_Storage.get("fvm_user_id");
 
       if (!groupedData || Object.keys(groupedData).length === 0) {
         body.textContent = "No active raffles found.";
@@ -1076,7 +1077,9 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
 
       const wrapper = this.make("div", {});
 
-      Object.entries(groupedData).forEach(([pageNum, stickersOnPage]) => {
+      for (const [pageNum, stickersOnPage] of Object.entries(
+        groupedData,
+      ).reverse()) {
         const header = this.make(
           "div",
           {
@@ -1095,54 +1098,54 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
             src: `https://fvm.itamer.com/images/stars-${starCount}.png`,
             className: "fvm-star-level",
           });
-          const stickerContainer = this.renderSticker(
+          const stickerContainer = await this.renderSticker(
             stickerName,
             stickersInLevel,
             starImage,
             gotItData?.[pageNum]?.includes(stickerName),
           );
           wrapper.append(stickerContainer);
-        }
 
-        // PILLS for this page
-        if (gotItData?.[pageNum]) {
-          const pillsContainer = this.make("div", {
-            className: "fvm-gotits-container",
-          });
+          // PILLS for this page
+          if (gotItData?.[pageNum]) {
+            const pillsContainer = this.make("div", {
+              className: "fvm-gotits-container",
+            });
 
-          const label = this.make(
-            "span",
-            {
-              style: { fontSize: "0.75em", color: "#888", width: "100%" },
-            },
-            "Collected Stickers (click to reactivate):",
-          );
-          pillsContainer.append(label);
+            const label = this.make(
+              "span",
+              {
+                style: { fontSize: "0.75em", color: "#888", width: "100%" },
+              },
+              "Collected Stickers (click to reactivate):",
+            );
+            pillsContainer.append(label);
 
-          gotItData[pageNum].forEach((pillName) => {
-            const pill = this.make(
+            gotItData[pageNum].forEach((pillName) => {
+              const pill = this.make(
+                "span",
+                {
+                  className: "got-it-pill",
+                  dataset: { keyword: pillName, page: pageNum },
+                },
+                `${pillName} ✕`,
+              );
+              pillsContainer.append(pill);
+            });
+
+            const allPill = this.make(
               "span",
               {
                 className: "got-it-pill",
-                dataset: { keyword: pillName, page: pageNum },
+                dataset: { keyword: "all", page: pageNum },
               },
-              `${pillName} ✕`,
+              `${FVM_Emojis.explode} All ✕`,
             );
-            pillsContainer.append(pill);
-          });
-
-          const allPill = this.make(
-            "span",
-            {
-              className: "got-it-pill",
-              dataset: { keyword: "all", page: pageNum },
-            },
-            `${FVM_Emojis.explode} All ✕`,
-          );
-          pillsContainer.append(allPill);
-          wrapper.append(pillsContainer);
+            pillsContainer.append(allPill);
+            wrapper.append(pillsContainer);
+          }
         }
-      });
+      }
 
       body.replaceChildren(wrapper);
       this.updateTimers();
@@ -1152,7 +1155,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
 
     //------------ R E N D E R  S T I C K E R ----------
 
-    renderSticker(stickerName, stickersInLevel, starImage, gotIt) {
+    async renderSticker(stickerName, stickersInLevel, starImage, gotIt) {
       let raffles = stickersInLevel[stickerName];
       const safeStickerName = stickerName.replace(/[^a-zA-Z0-9\-_.]/g, "");
 
@@ -1194,10 +1197,10 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         style: { padding: "2px 8px" },
       });
 
-      raffles.forEach((raffle) => {
-        const newRow = this.renderRow(raffle);
+      for (const raffle of raffles) {
+        const newRow = await this.renderRow(raffle);
         raffleInner.append(newRow);
-      });
+      }
 
       return this.make(
         "div",
@@ -1210,7 +1213,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       );
     },
 
-    renderRow(raffle) {
+    async renderRow(raffle) {
       const timeRemaining = this.getSecondsRemaining(
         parseInt(raffle.created_utc),
       );
@@ -1218,7 +1221,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       const raffleId = raffle.id || raffle.post_id;
       const flags = raffle.flags || "";
       const isEntered = raffle.status === "active";
-      const user = localStorage.getItem("fvm_user_id");
+      const user = await FVM_Storage.get("fvm_user_id");
 
       let label = isEntered ? this.labels.entered : this.labels.new;
       let newState = isEntered ? "entered" : "new";
@@ -2173,7 +2176,7 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const postId = e.target.dataset.postid;
-          const user = localStorage.getItem("fvm_user_id");
+          const user = await FVM_Storage.get("fvm_user_id");
           const flagType = e.target.dataset.flag;
           if (
             confirm(`Are you sure you want to flag this raffle as ${flagType}?`)
@@ -2222,13 +2225,45 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       });
     },
   };
+
+  const FVM_Storage = {
+    async migrate() {
+      const keys = ["fvm_user_id", "fvm_last_hourly", "fvm_view"];
+      for (const key of keys) {
+        const gmVal = await GM.getValue(key);
+        if (!gmVal) {
+          // the only time localStorage should be mentioned
+          const lsVal = localStorage.getItem(key);
+          if (lsVal) {
+            await GM.setValue(key, lsVal);
+            console.info(
+              `FVM: migrated ${key} from localStorage to GM storage`,
+            );
+          }
+        }
+      }
+    },
+
+    async get(key) {
+      return (await GM.getValue(key)) ?? null;
+    },
+
+    async set(key, value) {
+      await GM.setValue(key, value);
+    },
+    async remove(key) {
+      await GM.deleteValue(key);
+    },
+  };
+
   // Run immediately if document is ready, otherwise wait for load
   // --- 3. EXECUTION ---
-  const init = () => {
+  const init = async () => {
     if (document.body) {
       console.info("FVM Startup", FVM_SCRIPT_VERSION);
+      await FVM_Storage.migrate();
       FVM_UI.injectInterceptor();
-      FVM_UI.init();
+      await FVM_UI.init();
       FVM_Importer.runInitialImport();
       FVM_Importer.runHourlyImport();
       FVM_Importer.runStaleWinnerCheck();
