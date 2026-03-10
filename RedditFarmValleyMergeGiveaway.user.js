@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      3.34
+// @version      3.35
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -484,9 +484,16 @@
     },
   };
   // --- 2. UI MODULE ---
+  // new path?
+  // "https://playfmv-94o1jc-0-3-35-webview.devvit.net/raffle/stickers/stickerbook-2/"
+  //
+  //https://playfmv-94o1jc-0-3-31-webview.devvit.net/raffle/stickers/stickerbook-default/sticker_098.webp
   const FVM_UI = {
     STICKER_PATH:
       "https://playfmv-94o1jc-0-3-31-webview.devvit.net/raffle/stickers/stickerbook-default/",
+    STICKER_PATH_ALT:
+      "https://playfmv-94o1jc-0-3-35-webview.devvit.net/raffle/stickers/stickerbook-2/sticker_091.webp",
+
     init() {
       console.info("FVM_UI: Initializing...");
       this.currentView = this.getView();
@@ -1306,10 +1313,21 @@ span[data-role="info-trigger"][data-state="flagged"] { color: ${FVM_Colours.red}
       console.log(stickerName, stickerImagePath);
       if (!stickerImagePath) return null;
 
+      // const stickerImage = this.make("img", {
+      //   src: stickerImagePath,
+      //   style: { height: "30px", width: "20px", margin: "2px" },
+      // });
+
       const stickerImage = this.make("img", {
         src: stickerImagePath,
+        dataset: { name: stickerName, fallback: this.STICKER_PATH_ALT },
+        onerror: function () {
+          this.src = this.dataset.fallback + this.dataset.name;
+          this.onerror = null;
+        },
         style: { height: "30px", width: "20px", margin: "2px" },
       });
+
       const stickerPreviewBtn = this.make(
         "button",
         { className: "fvm-sticker-btn", title: "Preview sticker" },
