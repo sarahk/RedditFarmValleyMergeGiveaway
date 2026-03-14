@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.0
+// @version      4.01
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -499,6 +499,8 @@
       const detected = getRedditUsername();
       if (detected) await FVM_Storage.set("fvm_user_id", detected);
     }
+
+    FVM_UI.version = FVM_SCRIPT_VERSION;
 
     await FVM_UI.init({
       api: {
