@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.01
+// @version      4.02
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -164,68 +164,97 @@
     },
 
     runStaleWinnerCheck() {
+      console.info("FVM_Importer: Starting stale winner check...");
+      let staleCheckRunning = false;
+
       setInterval(async () => {
-        const now = Math.floor(Date.now() / 1000);
-        const staleTimers = document.querySelectorAll(
-          '.fvm-timer[data-state="expired"][data-checked="false"]',
-        );
+        if (staleCheckRunning) return;
+        staleCheckRunning = true;
 
-        for (const el of staleTimers) {
-          const created = parseInt(el.dataset.created);
-          const rowState = FVM_UI.getRowState(el);
+        try {
+          const now = Math.floor(Date.now() / 1000);
+          const user = await FVM_Storage.get("fvm_user_id");
 
-          if (rowState === "missed") {
-            el.dataset.checked = "true";
-            continue;
-          }
+          // Collect all eligible post IDs in one pass
+          const candidates = [];
+          const staleTimers = document.querySelectorAll(
+            '.fvm-timer[data-state="expired"][data-checked="false"]',
+          );
 
-          const timeSinceExpiry = now - created - TWENTY_FOUR_HOURS_S;
-          if (timeSinceExpiry >= 90) {
-            const postId = el.dataset.postid;
-            if (!postId) continue;
-            try {
-              const info = await FVM_API.sendToServer(
-                "post",
-                { post_id: postId },
-                "GET",
-              );
+          for (const el of staleTimers) {
+            if (FVM_UI.getRowState(el) === "missed") {
+              el.dataset.checked = "true";
+              continue;
+            }
 
-              if (info?.winner && info.winner !== "") {
-                el.dataset.checked = "true";
-                const user = await FVM_Storage.get("fvm_user_id");
-                const youWon = info.winner === user;
-                FVM_UI.setLinkText(
-                  el,
-                  youWon ? `🎉 ${info.winner} 🎉` : `🏆 ${info.winner}`,
-                );
+            // If the user has already visited the post and the save button is showing,
+            // they're actively reviewing it — leave it alone
+            const row = el.closest(".fvm-raffle-row");
+            if (row?.querySelector(".fvm-raffle-ok")) continue;
 
-                if (!youWon) {
-                  const row = el.closest(".fvm-raffle-row");
-                  const link = row?.querySelector(".fvm-raffle-link");
-                  const btn = FVM_UI.make(
-                    "button",
-                    {
-                      className: "fvm-raffle-ok",
-                      dataset: { postid: postId, from: "stale" },
-                    },
-                    "OK",
-                  );
-                  link?.after(btn);
-                  row?.querySelector("[data-role='notify']")?.remove();
-                }
-              } else {
-                if (
-                  info &&
-                  ((info.harvester > 1 && info.harvester < 7) ||
-                    (info.harvester === 7 && info.harvest_tries >= 3))
-                ) {
-                  el.dataset.checked = "true";
-                }
-              }
-            } catch (err) {
-              console.error(`[FVM] Stale check failed for ${postId}:`, err);
+            const created = parseInt(el.dataset.created);
+            const timeSinceExpiry = now - created - TWENTY_FOUR_HOURS_S;
+            if (timeSinceExpiry >= 90 && el.dataset.postid) {
+              candidates.push({ el, postId: el.dataset.postid });
             }
           }
+
+          if (candidates.length === 0) return;
+
+          // Single batched API call
+          const postIds = candidates.map((c) => c.postId);
+          console.info(
+            "FVM_Importer: Checking stale winners for posts:",
+            postIds,
+          );
+          const results = await FVM_API.sendToServer(
+            "winner-checklist",
+            {
+              what: "winner-checklist",
+              post_ids: JSON.stringify(postIds),
+            },
+            "GET",
+          );
+          console.info("FVM_Importer: Stale winner check results:", results);
+          // results expected as: { [postId]: { winner: "", harvester: N, harvest_tries: N } }
+          for (const { el, postId } of candidates) {
+            const info = results?.[postId];
+            if (!info) continue;
+
+            if (info.winner && info.winner !== "") {
+              el.dataset.checked = "true";
+              const youWon = info.winner === user;
+              FVM_UI.setLinkText(
+                el,
+                youWon ? `🎉 ${info.winner} 🎉` : `🏆 ${info.winner}`,
+              );
+
+              if (!youWon) {
+                const row = el.closest(".fvm-raffle-row");
+                const link = row?.querySelector(".fvm-raffle-link");
+                const btn = FVM_UI.make(
+                  "button",
+                  {
+                    className: "fvm-raffle-ok",
+                    dataset: { postid: postId, from: "stale" },
+                  },
+                  "OK",
+                );
+                link?.after(btn);
+                row?.querySelector("[data-role='notify']")?.remove();
+              }
+            } else if (
+              info &&
+              ((info.harvester > 1 && info.harvester < 7) ||
+                (info.harvester === 7 && info.harvest_tries >= 3))
+            ) {
+              el.dataset.checked = "true";
+            }
+          }
+        } catch (err) {
+          console.error("[FVM] Stale winner batch check failed:", err);
+        } finally {
+          staleCheckRunning = false;
         }
       }, 15000);
     },
@@ -247,6 +276,7 @@
               keyword: parsed?.keyword,
               stars: parsed?.stars,
               created_utc: p.created_utc,
+              updownvotes: p.score,
             };
           });
 
