@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.02
+// @version      4.04
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -456,32 +456,35 @@
   // ---------------------------------------------------------------------------
   // 6. FETCH INTERCEPTOR
   // ---------------------------------------------------------------------------
-  function injectInterceptor() {
-    const win = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
-    if (win.fvm_interceptor_loaded) return;
-    win.fvm_interceptor_loaded = true;
+  // function injectInterceptor() {
+  //   const win = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
+  //   if (win.fvm_interceptor_loaded) return;
+  //   win.fvm_interceptor_loaded = true;
 
-    const originalFetch = win.fetch;
-    win.fetch = async (...args) => {
-      const url = args[0] instanceof Request ? args[0].url : args[0];
-      if (url.includes("/api/posts/getRaffleData")) {
-        console.info("[FVM] Intercepting Raffle API...");
-        const response = await originalFetch(...args);
-        response
-          .clone()
-          .json()
-          .then((data) =>
-            window.dispatchEvent(
-              new CustomEvent("FVM_API_DATA", { detail: data }),
-            ),
-          )
-          .catch((err) => console.error("[FVM] JSON Parse Error:", err));
-        return response;
-      }
-      return originalFetch(...args);
-    };
-    console.info("[FVM] Global Fetch Wrapper Active");
-  }
+  //   const originalFetch = win.fetch;
+  //   win.fetch = function (...args) {
+  //     const url = args[0] instanceof Request ? args[0].url : String(args[0]);
+  //     if (!url.includes("/api/posts/getRaffleData")) {
+  //       return originalFetch.apply(this, args); // ← synchronous pass-through, no async wrapper
+  //     }
+  //     // only your interception path is async
+  //     return (async () => {
+  //       console.info("[FVM] Intercepting Raffle API...");
+  //       const response = await originalFetch.apply(this, args);
+  //       response
+  //         .clone()
+  //         .json()
+  //         .then((data) =>
+  //           window.dispatchEvent(
+  //             new CustomEvent("FVM_API_DATA", { detail: data }),
+  //           ),
+  //         )
+  //         .catch((err) => console.error("[FVM] JSON Parse Error:", err));
+  //       return response;
+  //     })();
+  //   };
+  //   console.info("[FVM] Global Fetch Wrapper Active");
+  // }
 
   // ---------------------------------------------------------------------------
   // 7. FVM_UI — loaded from fvm-ui.js via @require
@@ -521,7 +524,7 @@
     console.info("FVM Startup", FVM_SCRIPT_VERSION);
 
     await FVM_Storage.migrate();
-    injectInterceptor();
+    //injectInterceptor();
 
     // Auto-detect Reddit username and store if not already set
     const storedUser = await FVM_Storage.get("fvm_user_id");
