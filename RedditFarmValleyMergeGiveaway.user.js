@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.04
+// @version      4.05
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -148,14 +148,32 @@
         console.info("FVM_Importer: Running hourly keyword import...");
         try {
           const keywords = await FVM_API.sendToServer("keywords", {}, "GET");
-          if (Array.isArray(keywords)) {
-            for (const kw of keywords) {
-              await this.getJsonAndSend(
-                this.REDDIT_SEARCH_URL + `&q=${encodeURIComponent(kw)}`,
-              );
-              console.info(`FVM_Importer: Imported keyword '${kw}'`);
-            }
+
+          // Backwards compatible: server returns [] or null if another user
+          // is already processing (started within last 10 min), or if
+          // the global last run was <30 min ago
+          if (!Array.isArray(keywords) || keywords.length === 0) {
+            console.info(
+              "FVM_Importer: No keywords returned (server throttled or in-progress).",
+            );
+            return;
           }
+
+          for (const kw of keywords) {
+            await this.getJsonAndSend(
+              this.REDDIT_SEARCH_URL + `&q=${encodeURIComponent(kw)}`,
+            );
+            console.info(`FVM_Importer: Imported keyword '${kw}'`);
+          }
+
+          // Notify server that processing is complete
+          await FVM_API.sendToServer(
+            "keywords-completed",
+            { what: "keywords-completed" },
+            "POST",
+          );
+          console.info("FVM_Importer: Notified server of completion.");
+
           await FVM_Storage.set("fvm_last_hourly", now.toString());
         } catch (e) {
           console.error("Hourly task failed", e);
