@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.05
+// @version      4.06
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -105,7 +105,7 @@
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         body = new URLSearchParams({
           what: action,
-          username,
+          user: username,
           ...data,
         }).toString();
       }
@@ -570,6 +570,12 @@
     FVM_Importer.runInitialImport();
     FVM_Importer.runHourlyImport();
     FVM_Importer.runStaleWinnerCheck();
+    // track which version is running in case for tracking backwards compatibility or debugging old versions still running in the wild
+    void FVM_API.sendToServer(
+      "ping-user",
+      { what: "ping", version: FVM_SCRIPT_VERSION },
+      "POST",
+    );
   };
 
   if (document.readyState === "complete") {
