@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.06
+// @version      4.07
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -573,7 +573,7 @@
     // track which version is running in case for tracking backwards compatibility or debugging old versions still running in the wild
     void FVM_API.sendToServer(
       "ping-user",
-      { what: "ping", version: FVM_SCRIPT_VERSION },
+      { what: "ping", script: "userscript", version: FVM_SCRIPT_VERSION },
       "POST",
     );
   };
