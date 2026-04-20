@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.12
+// @version      4.13
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -16,7 +16,7 @@
 // @grant        GM.setValue
 // @grant        GM.deleteValue
 // @run-at       document-start
-// @require      https://fvm.itamer.com/fvm-ui.js?v=1.06
+// @require      https://fvm.itamer.com/fvm-ui.js?v=1.07
 // ==/UserScript==
 
 (function () {
