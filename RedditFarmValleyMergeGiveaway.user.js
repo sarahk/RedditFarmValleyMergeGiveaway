@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.14
+// @version      4.16
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -16,7 +16,7 @@
 // @grant        GM.setValue
 // @grant        GM.deleteValue
 // @run-at       document-start
-// @require      https://fvm.itamer.com/fvm-ui.js?v=1.08
+// @require      https://fvm.itamer.com/fvm-ui.js?v=1.09
 // ==/UserScript==
 
 (function () {
@@ -137,6 +137,15 @@
     GIVEAWAY_PREFIX: "[Sticker Giveaway]",
 
     async runInitialImport() {
+      const lastRun = await FVM_Storage.get("fvm_last_startup");
+      const now = Date.now();
+      if (lastRun && now - parseInt(lastRun) < 300000) {
+        console.info(
+          "FVM_Importer: Skipping startup import — last run was less than 5 minutes ago.",
+        );
+        return;
+      }
+      await FVM_Storage.set("fvm_last_startup", now.toString());
       console.info("FVM_Importer: Running initial import...");
       await this.getJsonAndSend(this.REDDIT_FEED_URL);
     },
@@ -353,7 +362,7 @@
       return "";
     },
 
-    async fetchRaffleDataRaw() {
+    async fetchRaffleDataRaw({ claim = false } = {}) {
       const loader = this.findLoader();
       if (!loader) return null;
 
@@ -362,8 +371,9 @@
       if (!token || !template) return null;
 
       const origin = new URL(template.split("?")[0]).origin;
-      try {
-        return await FVM_API.fetch({
+
+      const getRaffleData = () =>
+        FVM_API.fetch({
           method: "GET",
           url: `${origin}/api/posts/getRaffleData`,
           headers: {
@@ -371,6 +381,26 @@
             Accept: "application/json",
           },
         });
+
+      try {
+        const data = await getRaffleData();
+
+        if (!claim || data?.winner?.name) return data;
+
+        // Raffle has ended but no winner yet — try claiming then re-fetch
+        const now = Math.floor(Date.now() / 1000);
+        const endTime = Math.floor((data?.endTime ?? 0) / 1000);
+        if (endTime === 0 || now < endTime) return data;
+
+        const claimed = await this.claimRaffle(origin, token);
+        if (!claimed?.winnerName) return data;
+
+        const retryData = await getRaffleData();
+        return {
+          ...retryData,
+          winner: { name: claimed.winnerName },
+          _claimedViaDebug: true,
+        };
       } catch (e) {
         console.error("FVM_Extractor: fetchRaffleDataRaw failed", e);
         return null;
@@ -585,7 +615,8 @@
         setUser: (val) => FVM_Storage.set("fvm_user_id", val),
         saveRaffleData: (postId) => FVM_Extractor.saveRaffleData(postId),
         fetchRaffleData: (postId) => FVM_Extractor.fetchRaffleData(postId),
-        fetchRaffleDataRaw: () => FVM_Extractor.fetchRaffleDataRaw(),
+        fetchRaffleDataRaw: () =>
+          FVM_Extractor.fetchRaffleDataRaw({ claim: true }),
       },
       capabilities: {
         liveWinnerCheck: true,
