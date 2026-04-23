@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.13
+// @version      4.14
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -16,7 +16,7 @@
 // @grant        GM.setValue
 // @grant        GM.deleteValue
 // @run-at       document-start
-// @require      https://fvm.itamer.com/fvm-ui.js?v=1.07
+// @require      https://fvm.itamer.com/fvm-ui.js?v=1.08
 // ==/UserScript==
 
 (function () {
@@ -353,6 +353,30 @@
       return "";
     },
 
+    async fetchRaffleDataRaw() {
+      const loader = this.findLoader();
+      if (!loader) return null;
+
+      const token = loader.getAttribute("webbit-token");
+      const template = loader.getAttribute("webviewurltemplate");
+      if (!token || !template) return null;
+
+      const origin = new URL(template.split("?")[0]).origin;
+      try {
+        return await FVM_API.fetch({
+          method: "GET",
+          url: `${origin}/api/posts/getRaffleData`,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+      } catch (e) {
+        console.error("FVM_Extractor: fetchRaffleDataRaw failed", e);
+        return null;
+      }
+    },
+
     async fetchRaffleData() {
       const loader = this.findLoader();
       if (!loader) return null;
@@ -561,6 +585,7 @@
         setUser: (val) => FVM_Storage.set("fvm_user_id", val),
         saveRaffleData: (postId) => FVM_Extractor.saveRaffleData(postId),
         fetchRaffleData: (postId) => FVM_Extractor.fetchRaffleData(postId),
+        fetchRaffleDataRaw: () => FVM_Extractor.fetchRaffleDataRaw(),
       },
       capabilities: {
         liveWinnerCheck: true,
