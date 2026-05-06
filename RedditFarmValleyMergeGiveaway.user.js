@@ -1,6 +1,7 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.22
+// @version      4.23
+// @description  A userscript to track and display raffle winners for the Farm Merge Valley subreddit.  It scrapes giveaway posts, identifies winners by claiming raffles via the game's API, and surfaces this info in a convenient UI.  Also includes tools to mark giveaways as reviewed and clear old entries.
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @match        *://*.reddit.com/r/FarmMergeValley*
@@ -16,7 +17,7 @@
 // @grant        GM.setValue
 // @grant        GM.deleteValue
 // @run-at       document-start
-// @require      https://fvm.itamer.com/fvm-ui.js?v=1.15
+// @require      https://fvm.itamer.com/fvm-ui.js?v=1.23
 // ==/UserScript==
 
 (function () {
@@ -563,15 +564,6 @@
   //    Wire storage, navigation, and API adapter after import
   // ---------------------------------------------------------------------------
 
-  // Override view storage to use GM storage.
-  // _getView must be synchronous — we cache the value in localStorage
-  // after each set so it's available instantly on next load.
-  FVM_UI._getView = () => localStorage.getItem("fvm_view") || "stars";
-  FVM_UI._setView = (v) => {
-    localStorage.setItem("fvm_view", v); // sync cache for _getView
-    FVM_Storage.set("fvm_view", v); // persist to GM storage
-  };
-
   // Override navigation to use Reddit's SPA router
   FVM_UI._navigate = (url) => {
     const routerLink = document.createElement("a");
@@ -617,10 +609,45 @@
         fetchRaffleData: (postId) => FVM_Extractor.fetchRaffleData(postId),
         fetchRaffleDataRaw: () =>
           FVM_Extractor.fetchRaffleDataRaw({ claim: true }),
+
+        // Called by the debug modal when fvmdebug=1 and the canvas/token
+        // can't be found (code 4: No token found).
+        // Tracks repeated failures per post in GM storage as debugfails: { postId: n }.
+        // n increments each visit; when n reaches 4 (5th failure) the entry is
+        // cleared and a harvester_error is posted to the server with the given code.
+        onDebugFail: async (postId, code) => {
+          const codeLabels = { 4: "No token found" };
+          const label = codeLabels[code] ?? `code ${code}`;
+
+          const raw = await FVM_Storage.get("debugfails");
+          const fails = raw ? JSON.parse(raw) : {};
+          const n = fails[postId] ?? 0;
+
+          if (n === 4) {
+            // 5th failure — report to server and stop tracking
+            delete fails[postId];
+            await FVM_Storage.set("debugfails", JSON.stringify(fails));
+            try {
+              await FVM_API.sendToServer(
+                "harvester_error",
+                { post_id: postId, code },
+                "POST",
+              );
+              return `⚠️ ${label} — reported to server after 5 attempts (code ${code}).`;
+            } catch (e) {
+              return `⚠️ ${label} — server report failed: ${e?.message || e}`;
+            }
+          }
+
+          fails[postId] = n + 1;
+          await FVM_Storage.set("debugfails", JSON.stringify(fails));
+          return `⚠️ ${label} (attempt ${n + 1}/5 — will report to server on attempt 5).`;
+        },
       },
       capabilities: {
         liveWinnerCheck: true,
       },
+      storage: FVM_Storage,
     });
 
     FVM_Importer.runInitialImport();
