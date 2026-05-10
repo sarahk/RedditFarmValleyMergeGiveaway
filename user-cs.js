@@ -1,11 +1,9 @@
 // ==UserScript==
 // @name         CS Level Tracker
-// @version      2.16
+// @version      2.17
 // @description  A userscript to track and update user levels for the Farm Merge Valley subreddit.  Provides a UI to capture the author of a post, fetch their current level from Reddit or the database, and save updates back to the server.  Also includes batch tools to backfill votes and update user levels in bulk.
 // @match        *://*.reddit.com/r/FarmMergeValley/comments/*
 // @match        *://*.reddit.com/r/FarmMergeValley/*
-// @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/user-cs.js
-// @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/user-cs.js
 // @grant        GM_xmlhttpRequest
 // @grant        GM.getValue
 // @grant        GM.setValue
@@ -961,7 +959,12 @@
           animal_count: 1,
           xp: 0,
           visited_by: "bot",
-          url: window.location.href,
+          url: (() => {
+            // Strip ?csdebug=1 so it doesn't accumulate in the DB across runs
+            const u = new URL(window.location.href);
+            u.searchParams.delete("csdebug");
+            return u.toString();
+          })(),
         });
         log(`✅ Saved! Level ${level} recorded.`, "#6fcf97");
       } catch (e) {
