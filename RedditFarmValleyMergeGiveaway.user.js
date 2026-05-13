@@ -17,7 +17,7 @@
 // @grant        GM.setValue
 // @grant        GM.deleteValue
 // @run-at       document-start
-// @require      https://fvm.itamer.com/fvm-ui.js?v=1.23
+// @require      https://fvm.itamer.com/fvm-ui.js?v=1.24
 // ==/UserScript==
 
 (function () {
