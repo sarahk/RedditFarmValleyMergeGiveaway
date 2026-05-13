@@ -1,7 +1,7 @@
 
 # RedditFarmValleyMergeGiveaway
 
-<img width="312" height="300" alt="image" src="https://github.com/user-attachments/assets/adf4a5ab-588f-4410-b712-571c108d731f" />
+<img width="312" height="279" alt="image" src="https://github.com/user-attachments/assets/67ab2304-5e6a-4cb0-abab-b3ca0bf0df07" />
 
 Adds a popup to Reddit to show new giveaways for the game Farm Valley Merge and lets the user exclude giveaways that aren't needed.
 
