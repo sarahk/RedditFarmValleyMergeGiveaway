@@ -19,6 +19,8 @@ Adds a popup to Reddit to show new giveaways for the game Farm Valley Merge and 
 
 **Integrated Copy Tools:** Quickly copy usernames to your clipboard to facilitate prize claims or communication.
 
+**Alternative Webpage:** If you aren't confident to use a userscript, or are playing on your phone you can find a web version at https://fvm.itamer.com/stickers.html
+
 **How Farm Merge Valley raffles work**
 
 * a user earns a sticker by playing the game, if they already have the sticker they may be prompted to raffle the duplicate and earn bonus star vault points. The raffle will run for 24 hours and the user won't be prompted to start another until this one ends.
@@ -72,6 +74,10 @@ If you find you still get a warning message about needing to turn developer mode
 
 <img width="640" height="171" alt="image" src="https://github.com/user-attachments/assets/ddb308c7-99bf-4010-bd41-d609d78798d1" />
 
-If you're still having problems please let me know.
+**Open 10**
+
+Both the userscript and the webpage allow you to open 10 raffles at a time to speed up the entering process - you still have to click enter and let the game load. The tabs that open are treated as **popups**. Most browsers will block popups by default. Take a moment to find out how your browser manages popups and enable them either for sh.reddit.com (userscript) or fvm.itamer.com (webpage).
+
+**If you're still having problems please let me know.**
 
 
