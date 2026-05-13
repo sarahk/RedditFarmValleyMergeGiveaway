@@ -21,6 +21,10 @@ Adds a popup to Reddit to show new giveaways for the game Farm Valley Merge and 
 
 **Alternative Webpage:** If you aren't confident to use a userscript, or are playing on your phone you can find a web version at https://fvm.itamer.com/stickers.html
 
+**Raffle Counters:** at a glance see how many new raffles there are, how many you have entered, and how many have finished.
+
+**Clear OKs:** If another user has saved the winner of a raffle the userscript will show the winners name (or yours!) with an ok button. If you enter hundreds of raffles clicking through those can be time consuming so there's a button that will clear them all away.
+
 **How Farm Merge Valley raffles work**
 
 * a user earns a sticker by playing the game, if they already have the sticker they may be prompted to raffle the duplicate and earn bonus star vault points. The raffle will run for 24 hours and the user won't be prompted to start another until this one ends.
