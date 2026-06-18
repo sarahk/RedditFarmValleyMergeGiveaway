@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.27
+// @version      4.28
 // @description  A userscript to track and display raffle winners for the Farm Merge Valley subreddit.  It scrapes giveaway posts, identifies winners by claiming raffles via the game's API, and surfaces this info in a convenient UI.  Also includes tools to mark giveaways as reviewed and clear old entries.
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
@@ -17,7 +17,7 @@
 // @grant        GM.setValue
 // @grant        GM.deleteValue
 // @run-at       document-start
-// @require      https://fvm.itamer.com/fvm-ui.js?v=1.27
+// @require      https://fvm.itamer.com/fvm-ui.js?v=1.28
 // ==/UserScript==
 
 (function () {
@@ -340,8 +340,9 @@
   // 4. EXTRACTOR
   // ---------------------------------------------------------------------------
   const FVM_Extractor = {
-    async saveRaffleData(postId = null) {
-      const raffleData = await this.fetchRaffleData();
+    async saveRaffleData(postId = null, prefetchedData = null) {
+      //const raffleData = await this.fetchRaffleData();
+      const raffleData = prefetchedData ?? await this.fetchRaffleData();
       if (!raffleData?.winner?.name) return "";
       try {
         await FVM_API.sendToServer(
