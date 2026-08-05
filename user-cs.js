@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         CS Level Tracker
-// @version      2.17
+// @version      2.18
 // @description  A userscript to track and update user levels for the Farm Merge Valley subreddit.  Provides a UI to capture the author of a post, fetch their current level from Reddit or the database, and save updates back to the server.  Also includes batch tools to backfill votes and update user levels in bulk.
 // @match        *://*.reddit.com/r/FarmMergeValley/comments/*
 // @match        *://*.reddit.com/r/FarmMergeValley/*
@@ -28,6 +28,7 @@
   const CS_LISTS = [
     { name: "Team A", value: "Club Susan" },
     { name: "Team B", value: "Waiting" },
+    { name: "Team C", value: "Team C" },
     { name: "Other", value: "Other" },
   ];
 
