@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.29
+// @version      4.30
 // @description  A userscript to track and display raffle winners for the Farm Merge Valley subreddit.  It scrapes giveaway posts, identifies winners by claiming raffles via the game's API, and surfaces this info in a convenient UI.  Also includes tools to mark giveaways as reviewed and clear old entries.
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
@@ -17,7 +17,7 @@
 // @grant        GM.setValue
 // @grant        GM.deleteValue
 // @run-at       document-start
-// @require      https://fvm.itamer.com/fvm-ui.js?v=1.28
+// @require      https://fvm.itamer.com/fvm-ui.js?v=1.30
 // ==/UserScript==
 
 (function () {
@@ -103,7 +103,6 @@
       if (isGet) {
         url += `?what=${action}&username=${username}&${new URLSearchParams(data).toString()}`;
       } else {
-        url += `?what=${action}`;
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         body = new URLSearchParams({
           what: action,
@@ -343,7 +342,7 @@
   const FVM_Extractor = {
     async saveRaffleData(postId = null, prefetchedData = null) {
       //const raffleData = await this.fetchRaffleData();
-      const raffleData = prefetchedData ?? await this.fetchRaffleData();
+      const raffleData = prefetchedData ?? (await this.fetchRaffleData());
       if (!raffleData?.winner?.name) return "";
       try {
         await FVM_API.sendToServer(
@@ -366,14 +365,9 @@
     },
 
     async fetchRaffleDataRaw({ claim = false } = {}) {
-      const loader = this.findLoader();
-      if (!loader) return null;
-
-      const token = loader.getAttribute("webbit-token");
-      const template = loader.getAttribute("webviewurltemplate");
-      if (!token || !template) return null;
-
-      const origin = new URL(template.split("?")[0]).origin;
+      const info = FVM_DevvitLoader.find();
+      if (!info) return null;
+      const { token, origin } = info;
 
       const getRaffleData = () =>
         FVM_API.fetch({
@@ -411,14 +405,9 @@
     },
 
     async fetchRaffleData() {
-      const loader = this.findLoader();
-      if (!loader) return null;
-
-      const token = loader.getAttribute("webbit-token");
-      const template = loader.getAttribute("webviewurltemplate");
-      if (!token || !template) return null;
-
-      const origin = new URL(template.split("?")[0]).origin;
+      const info = FVM_DevvitLoader.find();
+      if (!info) return null;
+      const { token, origin } = info;
       try {
         const data = await FVM_API.fetch({
           method: "GET",
@@ -475,22 +464,6 @@
     getPostIdFromUrl() {
       const segments = new URL(window.location.href).pathname.split("/");
       return segments[segments.indexOf("comments") + 1];
-    },
-
-    findLoader() {
-      const selector = "shreddit-devvit-ui-loader";
-      const loaders = document.querySelectorAll(selector);
-      if (loaders.length > 0) return loaders[loaders.length - 1];
-
-      const containers = document.querySelectorAll("shreddit-post");
-      if (containers.length > 0) {
-        const lastPost = containers[containers.length - 1];
-        if (lastPost.shadowRoot) {
-          const found = lastPost.shadowRoot.querySelector(selector);
-          if (found) return found;
-        }
-      }
-      return null;
     },
   };
 
