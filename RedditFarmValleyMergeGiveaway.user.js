@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.30
+// @version      4.31
 // @description  A userscript to track and display raffle winners for the Farm Merge Valley subreddit.  It scrapes giveaway posts, identifies winners by claiming raffles via the game's API, and surfaces this info in a convenient UI.  Also includes tools to mark giveaways as reviewed and clear old entries.
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
@@ -17,7 +17,7 @@
 // @grant        GM.setValue
 // @grant        GM.deleteValue
 // @run-at       document-start
-// @require      https://fvm.itamer.com/fvm-ui.js?v=1.30
+// @require      https://fvm.itamer.com/fvm-ui.js?v=1.31
 // ==/UserScript==
 
 (function () {
@@ -314,6 +314,12 @@
             { payload: JSON.stringify(minimalData) },
             "POST",
           );
+          // Single point of truth for "last json send" — mirrors
+          // background.js's getJsonAndSend (the extension side of this same
+          // fix), so the fvm-ui.js popup label (which reads
+          // fvm_last_json_send) reflects every successful send from either
+          // the initial or hourly import, not just the once-per-startup one.
+          await FVM_Storage.set("fvm_last_json_send", Date.now().toString());
         }
       } catch (e) {
         console.error("getJsonAndSend failed for " + redditUrl, e);
