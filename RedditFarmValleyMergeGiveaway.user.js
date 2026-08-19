@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         FarmMergeValley Giveaway Pop-up
-// @version      4.31
+// @version      4.39
 // @description  A userscript to track and display raffle winners for the Farm Merge Valley subreddit.  It scrapes giveaway posts, identifies winners by claiming raffles via the game's API, and surfaces this info in a convenient UI.  Also includes tools to mark giveaways as reviewed and clear old entries.
 // @updateURL    https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
 // @downloadURL  https://raw.githubusercontent.com/sarahk/RedditFarmValleyMergeGiveaway/main/RedditFarmValleyMergeGiveaway.user.js
@@ -17,7 +17,7 @@
 // @grant        GM.setValue
 // @grant        GM.deleteValue
 // @run-at       document-start
-// @require      https://fvm.itamer.com/fvm-ui.js?v=1.31
+// @require      https://fvm.itamer.com/fvm-ui.js?v=1.39
 // ==/UserScript==
 
 (function () {
@@ -250,31 +250,30 @@
             if (!info) continue;
 
             if (info.winner && info.winner !== "") {
-              el.dataset.checked = "true";
-              const youWon = info.winner === user;
-              FVM_UI.setLinkText(
-                el,
-                youWon ? `🎉 ${info.winner} 🎉` : `🏆 ${info.winner}`,
-              );
-
-              if (!youWon) {
-                const row = el.closest(".fvm-raffle-row");
-                const link = row?.querySelector(".fvm-raffle-link");
-                const btn = FVM_UI.make(
-                  "button",
-                  {
-                    className: "fvm-raffle-ok",
-                    dataset: { postid: postId, from: "stale" },
-                  },
-                  "OK",
+              // Rebuild the row from the winner we just learned, instead of
+              // hand-patching the link text and (for a non-self win)
+              // hand-building a fresh OK button — same reasoning as
+              // FVM_UI.rebuildRow itself: a full rebuild can't forget a
+              // piece of the row the way a one-off patch can. `checked`
+              // stays false — the row is still unacknowledged, just now
+              // showing who won; that matches the previous behavior where a
+              // self-win got no OK button (nothing to acknowledge) while
+              // someone else's win got one.
+              const row = el.closest(".fvm-raffle-row");
+              if (row) {
+                await FVM_UI.rebuildRow(
+                  row,
+                  { winner: info.winner },
+                  { checked: false },
                 );
-                link?.after(btn);
-                row?.querySelector("[data-role='notify']")?.remove();
+              } else {
+                el.dataset.checked = "true";
               }
             } else if (
               info &&
               ((info.harvester > 1 && info.harvester < 7) ||
-                (info.harvester === 7 && info.harvest_tries >= 3))
+                (info.harvester === 7 && info.harvest_tries >= 3) ||
+                info.harvester === 8) // 8 = winner does not exist — terminal, stop checking
             ) {
               el.dataset.checked = "true";
             }
